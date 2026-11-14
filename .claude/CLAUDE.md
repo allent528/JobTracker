@@ -44,7 +44,7 @@ Run from the repo root. Everything except the pre-commit check arrives with laun
 ## Environment constraints
 - Development is on Windows 11. Use forward-slash paths in scripts, and keep package scripts cross-platform (no bash-only syntax; use Node scripts for anything nontrivial).
 - Docker Desktop must be running for the local Supabase stack. Migrations are written and verified locally (`db reset`, RLS checks, advisors); `npx supabase db push` to prod is live and needs the owner's OK each time.
-- Only one hosted project exists (free-tier limit). Never run tests, seeds or experiments against it.
+- Only one hosted project exists for JobTracker, and it is production. Never run tests, seeds or experiments against it.
 - Free Supabase projects pause after about a week idle. If requests time out, check whether the project is paused before debugging code.
 - Env vars: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` (git-ignored), pointing at the local stack (values from `npx supabase status`). Vercel production holds the prod values.
 
