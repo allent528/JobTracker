@@ -77,6 +77,6 @@ Each rule loads **automatically when you read or edit a file matching its `paths
 | `auth.md` | `src/proxy.ts`, `src/lib/supabase/**`, `src/app/(auth)/**`, `src/app/auth/**` | Supabase SSR clients, session handling, magic link + OTP, route protection |
 | `server-actions.md` | `src/app/**/actions.ts`, `src/lib/**` | Data reads/writes, validation, revalidation, status logic, dates |
 | `ui.md` | `src/app/**/*.tsx`, `src/components/**` | shadcn/Tailwind conventions, board, forms, accessibility, responsive |
-| `testing.md` | `**/*.test.ts`, `tests/**`, `playwright.config.ts`, `vitest.config.ts` | Unit, RLS and e2e test conventions, fake data |
+| `testing.md` | `**/*.test.ts`, `**/*.test.tsx`, `tests/**`, `playwright.config.ts`, `vitest.config.mts` | Unit, RLS and e2e test conventions, fake data |
 
 When you learn something that should change how an area is built, update its rule file in the same task (and `docs/learnings.md`).

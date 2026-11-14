@@ -67,11 +67,11 @@
 **Owner to-dos still open:** reset the DB password; in the Supabase dashboard, turn off sign-ups, add your user and put `{{ .Token }}` in the Magic Link email template (before step 2); decide read-only MCP.
 
 ## 2026-11-14: Launch step 1 (project skeleton)
-**Status:** Done, pending owner review (branch `feat/project-skeleton`, not committed yet)
+**Status:** Done, pending owner review (PR 1, branch `feat/project-skeleton`)
 **What was done**
 - Next.js 16.4.6 / React 19.3 / Tailwind 4.3.3 scaffolded in a scratch dir and merged into the root. Minimal home page (h1 "JobTracker"), metadata title set, Geist font and boilerplate SVGs dropped (system font stacks in `globals.css`; no `public/` yet).
 - shadcn/ui init (Radix base, new-york, neutral) + `button`. shadcn now ships its own `cn` package (`shadcn-ui/cn`) in place of clsx + tailwind-merge.
-- `src/lib/status.ts`: the 9 PRD statuses (`STATUSES`, `STATUS_VALUES`, `ACTIVE_STATUSES`, `CLOSED_STATUSES`, `nextSuggestedStatus`, `statusLabel`) with 5 Vitest tests.
+- `src/lib/status.ts`: the 9 PRD statuses as a literal tuple `STATUSES` (ready for `z.enum`), `STATUS_META` (label, kind; `satisfies Record<Status, …>` so a missing entry fails to compile), `ACTIVE_STATUSES`, `CLOSED_STATUSES`, `nextSuggestedStatus`. 5 Vitest tests.
 - Vitest (`vitest.config.mts`), Playwright (Chromium, `tests/e2e/smoke.spec.ts`), `@supabase/supabase-js` + `@supabase/ssr` installed (unused until step 2).
 - Local Supabase: `supabase init` + `start` (never linked), `enable_signup = false`, comment-only `seed.sql`, `db reset` clean, `npm run db:types` writes an ASCII file that typechecks (empty schema).
 - `.env.local` from `npx supabase status` (local keys only, git-ignored; hook blocks it). `.env.example` now says "Copy to .env.local".
@@ -82,4 +82,5 @@
 - shadcn base: Radix (react-hook-form + shadcn form components in D14 are documented against it).
 - `@types/node` ^22 to match CI's Node 22.
 **Follow-ups**
+- Step 2 planning: `next.config.ts` has `cacheComponents: true`, which changes how `cookies()` and dynamic data are accessed (Suspense boundaries); account for it in the `@supabase/ssr` server client and `src/proxy.ts`.
 - Owner to-dos from the plan entry are still open (DB password reset, dashboard sign-ups off + user + `{{ .Token }}` template before step 2, read-only MCP decision).

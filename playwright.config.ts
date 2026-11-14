@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// E2E runs locally against the dev server and the local Supabase stack only (D4), never prod.
-// Chromium only for now; add Firefox and WebKit before launch.
+// Chromium only for now; add Firefox and WebKit before launch (owner decision, step 1).
+const baseURL = "http://localhost:3000";
+
 export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: true,
@@ -9,13 +10,13 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:3000",
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

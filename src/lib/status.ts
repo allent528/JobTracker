@@ -1,36 +1,38 @@
-// The one source of status values (PRD lifecycle, D7). The `applications.status` check
-// constraint mirrors STATUS_VALUES; change both in the same PR.
-
+// Mirrored by the `applications.status` check constraint (D7); change both in the same PR.
 export const STATUSES = [
-  { value: "saved", label: "Saved", kind: "active" },
-  { value: "applied", label: "Applied", kind: "active" },
-  { value: "screening", label: "Screening", kind: "active" },
-  { value: "interviewing", label: "Interviewing", kind: "active" },
-  { value: "offer", label: "Offer", kind: "active" },
-  { value: "accepted", label: "Accepted", kind: "closed" },
-  { value: "rejected", label: "Rejected", kind: "closed" },
-  { value: "withdrawn", label: "Withdrawn", kind: "closed" },
-  { value: "ghosted", label: "Ghosted", kind: "closed" },
+  "saved",
+  "applied",
+  "screening",
+  "interviewing",
+  "offer",
+  "accepted",
+  "rejected",
+  "withdrawn",
+  "ghosted",
 ] as const;
 
-export type StatusInfo = (typeof STATUSES)[number];
-export type Status = StatusInfo["value"];
-export type StatusKind = StatusInfo["kind"];
+export type Status = (typeof STATUSES)[number];
+export type StatusKind = "active" | "closed";
 
-/** Tuple of values, in lifecycle order (e.g. for `z.enum`). */
-export const STATUS_VALUES = STATUSES.map((s) => s.value) as [Status, ...Status[]];
+export const STATUS_META = {
+  saved: { label: "Saved", kind: "active" },
+  applied: { label: "Applied", kind: "active" },
+  screening: { label: "Screening", kind: "active" },
+  interviewing: { label: "Interviewing", kind: "active" },
+  offer: { label: "Offer", kind: "active" },
+  accepted: { label: "Accepted", kind: "closed" },
+  rejected: { label: "Rejected", kind: "closed" },
+  withdrawn: { label: "Withdrawn", kind: "closed" },
+  ghosted: { label: "Ghosted", kind: "closed" },
+} as const satisfies Record<Status, { label: string; kind: StatusKind }>;
 
-export const ACTIVE_STATUSES = STATUSES.filter((s) => s.kind === "active").map((s) => s.value);
-export const CLOSED_STATUSES = STATUSES.filter((s) => s.kind === "closed").map((s) => s.value);
+export const ACTIVE_STATUSES: readonly Status[] = STATUSES.filter((s) => STATUS_META[s].kind === "active");
+export const CLOSED_STATUSES: readonly Status[] = STATUSES.filter((s) => STATUS_META[s].kind === "closed");
 
-const FORWARD_PATH: readonly Status[] = ["saved", "applied", "screening", "interviewing", "offer", "accepted"];
+// Suggested only; any status may change to any other (D6).
+const FORWARD_PATH: readonly Status[] = [...ACTIVE_STATUSES, "accepted"];
 
-/** The next step on the suggested forward path, or null at the end or off it. A UI hint only (D6). */
 export function nextSuggestedStatus(status: Status): Status | null {
   const i = FORWARD_PATH.indexOf(status);
   return i === -1 || i === FORWARD_PATH.length - 1 ? null : FORWARD_PATH[i + 1];
-}
-
-export function statusLabel(status: Status): string {
-  return STATUSES.find((s) => s.value === status)!.label;
 }
