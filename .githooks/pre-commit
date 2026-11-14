@@ -1,0 +1,4 @@
+#!/bin/sh
+# Blocks secrets/ignored files and runs the fast checks before every commit. Installed by the
+# package "prepare" script (git config core.hooksPath .githooks). Never bypass with --no-verify.
+exec node scripts/precommit.mjs
