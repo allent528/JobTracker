@@ -441,3 +441,9 @@ coverage/
 out/
 supabase/.temp/
 supabase/.branches/
+next-env.d.ts
+*.tsbuildinfo
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

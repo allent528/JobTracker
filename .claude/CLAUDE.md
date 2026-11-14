@@ -25,16 +25,16 @@ tests/               e2e/ (Playwright); unit tests sit next to source as *.test.
 docs/                prd/, progress.md, learnings.md, negative-constraints.md
 scripts/             project scripts (precommit.mjs, checks)
 ```
-Until launch step 1 runs, only `docs/`, `scripts/` and `.claude/` exist.
 
 ## Commands
-Run from the repo root. Everything except the pre-commit check arrives with launch step 1 (Next.js skeleton). Until then, those commands are **not set up yet**.
+Run from the repo root.
 - Install: `npm install` (also enables the pre-commit hook via the `prepare` script)
-- Dev server: `npm run dev` (not set up yet)
-- Typecheck: `npm run typecheck` → `next typegen && tsc --noEmit` (not set up yet)
-- Lint: `npm run lint` (not set up yet)
-- Unit tests: `npm test` → `vitest run` (not set up yet)
-- E2E: `npm run test:e2e` → `playwright test` (not set up yet)
+- Dev server: `npm run dev`
+- Typecheck: `npm run typecheck` → `next typegen && tsc --noEmit`
+- Lint: `npm run lint`
+- Build: `npm run build` (CI runs it with placeholder env)
+- Unit tests: `npm test` → `vitest run`
+- E2E: `npm run test:e2e` → `playwright test`
 - Local Supabase: `npx supabase start` / `npx supabase stop` (needs Docker Desktop running); `npx supabase db reset` reapplies all migrations + seed locally
 - DB types: `npm run db:types` (generated from the local stack)
 - New migration: `npx supabase migration new <snake_case_name>`; apply only via the `db-migration` skill.
