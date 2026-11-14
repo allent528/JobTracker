@@ -124,7 +124,7 @@ Child rows cascade-delete with their application.
 
 ## Launch plan
 <!-- Ordered steps. Claude works one step at a time. -->
-1. **Project skeleton:** Next.js (App Router, TypeScript, Tailwind, shadcn/ui) at the repo root with typecheck, lint, test (Vitest) and CI green. Install Docker Desktop, run the local Supabase stack (`npx supabase init`, `npx supabase start`) for development, create one hosted project JobTracker (`skcsrdyqsqkinrrwtdyh`) (the free tier allows 2 active projects and the owner already uses one), and add env vars.
+1. **Project skeleton:** Next.js (App Router, TypeScript, Tailwind, shadcn/ui) at the repo root with typecheck, lint, test (Vitest) and CI green. Install Docker Desktop, run the local Supabase stack (`npx supabase init`, `npx supabase start`) for development, create one hosted project JobTracker (`skcsrdyqsqkinrrwtdyh`), and add env vars.
 2. **Auth (F1):** magic-link login, protected routes via `src/proxy.ts`, sign-ups disabled.
 3. **Schema:** migrations for all tables (statuses as text + check constraints, D7), RLS, the `status_events` trigger (D5) and the `profiles` trigger; generate types.
 4. **Applications CRUD (F2) + status changes (F4).**
@@ -149,7 +149,7 @@ Settled 2026-11-14. Change one only by editing this table and noting why in `doc
 | --- | --- | --- | --- |
 | D1 | Data access | Server Components + Server Actions via `@supabase/ssr`; RLS on every table as the backstop | Server-rendered pages, protected routes, one security model |
 | D1b | Query layer | `supabase-js` + generated types; no ORM | An ORM connecting as the database owner bypasses RLS |
-| D2 | Environments | Local Supabase stack in Docker for development; one hosted project, JobTracker (`skcsrdyqsqkinrrwtdyh`), for production | Free tier allows 2 active projects and one is already used; migrations are tested locally before prod |
+| D2 | Environments | Local Supabase stack in Docker for development; one hosted project, JobTracker (`skcsrdyqsqkinrrwtdyh`), for production | Fast, free, disposable dev database; migrations are tested locally before prod |
 | D3 | Repo shape | Single Next.js app at the repo root | Monorepo only if the browser extension (L4) arrives |
 | D4 | Testing | Vitest for pure logic; SQL scripts for RLS checks; Playwright for 2–3 key flows, signing in a test user via the local admin API; all against the local stack | Fast, deterministic, never touches prod; the local mail catcher (Mailpit) is there for manual magic-link checks |
 | D5 | Status history | `after insert or update of status` trigger writes `status_events` | No code path can skip the log |

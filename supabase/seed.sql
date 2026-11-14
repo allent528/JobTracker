@@ -1,0 +1,2 @@
+-- Local development seed. Fake data only (Acme Corp, jane@example.com, 555-0100); never real people.
+-- Runs on `npx supabase db reset`. Rows arrive once the schema exists (launch step 3).

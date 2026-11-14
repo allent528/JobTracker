@@ -4,7 +4,7 @@ paths:
   - "**/*.test.tsx"
   - "tests/**"
   - "playwright.config.ts"
-  - "vitest.config.ts"
+  - "vitest.config.mts"
 ---
 
 # Testing: unit, RLS, e2e

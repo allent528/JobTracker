@@ -25,16 +25,16 @@ tests/               e2e/ (Playwright); unit tests sit next to source as *.test.
 docs/                prd/, progress.md, learnings.md, negative-constraints.md
 scripts/             project scripts (precommit.mjs, checks)
 ```
-Until launch step 1 runs, only `docs/`, `scripts/` and `.claude/` exist.
 
 ## Commands
-Run from the repo root. Everything except the pre-commit check arrives with launch step 1 (Next.js skeleton). Until then, those commands are **not set up yet**.
+Run from the repo root.
 - Install: `npm install` (also enables the pre-commit hook via the `prepare` script)
-- Dev server: `npm run dev` (not set up yet)
-- Typecheck: `npm run typecheck` → `next typegen && tsc --noEmit` (not set up yet)
-- Lint: `npm run lint` (not set up yet)
-- Unit tests: `npm test` → `vitest run` (not set up yet)
-- E2E: `npm run test:e2e` → `playwright test` (not set up yet)
+- Dev server: `npm run dev`
+- Typecheck: `npm run typecheck` → `next typegen && tsc --noEmit`
+- Lint: `npm run lint`
+- Build: `npm run build` (CI runs it with placeholder env)
+- Unit tests: `npm test` → `vitest run`
+- E2E: `npm run test:e2e` → `playwright test`
 - Local Supabase: `npx supabase start` / `npx supabase stop` (needs Docker Desktop running); `npx supabase db reset` reapplies all migrations + seed locally
 - DB types: `npm run db:types` (generated from the local stack)
 - New migration: `npx supabase migration new <snake_case_name>`; apply only via the `db-migration` skill.
@@ -44,7 +44,7 @@ Run from the repo root. Everything except the pre-commit check arrives with laun
 ## Environment constraints
 - Development is on Windows 11. Use forward-slash paths in scripts, and keep package scripts cross-platform (no bash-only syntax; use Node scripts for anything nontrivial).
 - Docker Desktop must be running for the local Supabase stack. Migrations are written and verified locally (`db reset`, RLS checks, advisors); `npx supabase db push` to prod is live and needs the owner's OK each time.
-- Only one hosted project exists (free-tier limit). Never run tests, seeds or experiments against it.
+- Only one hosted project exists for JobTracker, and it is production. Never run tests, seeds or experiments against it.
 - Free Supabase projects pause after about a week idle. If requests time out, check whether the project is paused before debugging code.
 - Env vars: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` (git-ignored), pointing at the local stack (values from `npx supabase status`). Vercel production holds the prod values.
 
@@ -77,6 +77,6 @@ Each rule loads **automatically when you read or edit a file matching its `paths
 | `auth.md` | `src/proxy.ts`, `src/lib/supabase/**`, `src/app/(auth)/**`, `src/app/auth/**` | Supabase SSR clients, session handling, magic link + OTP, route protection |
 | `server-actions.md` | `src/app/**/actions.ts`, `src/lib/**` | Data reads/writes, validation, revalidation, status logic, dates |
 | `ui.md` | `src/app/**/*.tsx`, `src/components/**` | shadcn/Tailwind conventions, board, forms, accessibility, responsive |
-| `testing.md` | `**/*.test.ts`, `tests/**`, `playwright.config.ts`, `vitest.config.ts` | Unit, RLS and e2e test conventions, fake data |
+| `testing.md` | `**/*.test.ts`, `**/*.test.tsx`, `tests/**`, `playwright.config.ts`, `vitest.config.mts` | Unit, RLS and e2e test conventions, fake data |
 
 When you learn something that should change how an area is built, update its rule file in the same task (and `docs/learnings.md`).
