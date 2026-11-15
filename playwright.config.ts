@@ -6,6 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
 // Chromium only for now; add Firefox and WebKit before launch (owner decision, step 1).
+
 // Must match site_url in supabase/config.toml: the magic link is built from it.
 const baseURL = "http://localhost:3000";
 

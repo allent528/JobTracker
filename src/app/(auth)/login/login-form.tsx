@@ -4,10 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
+import type { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { ERROR_PARAM, LINK_ERROR, NEXT_PARAM } from "@/lib/auth-routes";
 import {
   OTP_LENGTH,
   type SignInEmailInput,
@@ -19,17 +21,21 @@ import { requestSignInEmail, verifySignInCode } from "./actions";
 
 const codeSchema = verifyCodeSchema.pick({ code: true });
 
-const LINK_ERROR = "That sign-in link is invalid or has expired. Request a new one below.";
+const LINK_ERROR_MESSAGE = "That sign-in link is invalid or has expired. Request a new one below.";
 
 export function LoginForm() {
   const searchParams = useSearchParams();
-  const next = searchParams.get("next");
+  const next = searchParams.get(NEXT_PARAM);
+  const [linkError, setLinkError] = useState(searchParams.get(ERROR_PARAM) === LINK_ERROR);
   const [email, setEmail] = useState<string | null>(null);
 
   return email === null ? (
     <EmailStep
-      initialError={searchParams.get("error") === "link" ? LINK_ERROR : null}
-      onSent={setEmail}
+      initialError={linkError ? LINK_ERROR_MESSAGE : null}
+      onSent={(sentTo) => {
+        setLinkError(false);
+        setEmail(sentTo);
+      }}
     />
   ) : (
     <CodeStep email={email} next={next} onBack={() => setEmail(null)} />
@@ -96,7 +102,7 @@ function CodeStep({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const statusRef = useRef<HTMLParagraphElement>(null);
-  const form = useForm<{ code: string }>({
+  const form = useForm<z.input<typeof codeSchema>>({
     resolver: zodResolver(codeSchema),
     defaultValues: { code: "" },
   });
@@ -106,7 +112,6 @@ function CodeStep({
   const onSubmit = form.handleSubmit(({ code }) => {
     setError(null);
     startTransition(async () => {
-      // On success the action redirects, so a result only comes back on failure.
       const result = await verifySignInCode({ email, code }, next);
       if (!result.ok) setError(result.error);
     });

@@ -1,8 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { HOME_PATH, isPublicPath, LOGIN_PATH } from "@/lib/auth-routes";
+import { HOME_PATH, isPublicPath, LOGIN_PATH, loginUrl } from "@/lib/auth-routes";
 import type { Database } from "@/types/database.types";
+
+import { supabaseEnv } from "./env";
 
 /**
  * Refreshes the Supabase session on every request and redirects signed-out
@@ -11,26 +13,23 @@ import type { Database } from "@/types/database.types";
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+  const { url, publishableKey } = supabaseEnv();
 
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet, headers) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-          Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value));
-        },
+  const supabase = createServerClient<Database>(url, publishableKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet, headers) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+        Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value));
       },
     },
-  );
+  });
 
   // Keep this call right after createServerClient: it verifies the JWT and
   // refreshes the session, writing new cookies through setAll above.
@@ -38,30 +37,17 @@ export async function updateSession(request: NextRequest) {
   const signedIn = Boolean(data?.claims?.sub);
   const { pathname, search } = request.nextUrl;
 
-  if (!signedIn && !isPublicPath(pathname)) {
-    const url = request.nextUrl.clone();
-    url.pathname = LOGIN_PATH;
-    url.search = "";
-    if (pathname !== HOME_PATH) url.searchParams.set("next", `${pathname}${search}`);
-    return redirectWithCookies(url, response);
-  }
+  // A redirect must carry any refreshed session cookies and the no-cache headers.
+  const redirectTo = (path: string) => {
+    const redirect = NextResponse.redirect(new URL(path, request.url));
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    response.headers.forEach((value, key) => {
+      if (/^(cache-control|expires|pragma)$/i.test(key)) redirect.headers.set(key, value);
+    });
+    return redirect;
+  };
 
-  if (signedIn && pathname === LOGIN_PATH) {
-    const url = request.nextUrl.clone();
-    url.pathname = HOME_PATH;
-    url.search = "";
-    return redirectWithCookies(url, response);
-  }
-
+  if (!signedIn && !isPublicPath(pathname)) return redirectTo(loginUrl({ next: `${pathname}${search}` }));
+  if (signedIn && pathname === LOGIN_PATH) return redirectTo(HOME_PATH);
   return response;
-}
-
-/** A redirect must carry any refreshed session cookies and no-cache headers. */
-function redirectWithCookies(url: URL, from: NextResponse) {
-  const redirect = NextResponse.redirect(url);
-  from.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-  from.headers.forEach((value, key) => {
-    if (/^(cache-control|expires|pragma)$/i.test(key)) redirect.headers.set(key, value);
-  });
-  return redirect;
 }

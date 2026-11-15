@@ -2,10 +2,9 @@ import { createBrowserClient } from "@supabase/ssr";
 
 import type { Database } from "@/types/database.types";
 
-/** Supabase client for Client Components. Uses the publishable key and the user's session cookies. */
+import { supabaseEnv } from "./env";
+
 export function createClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-  );
+  const { url, publishableKey } = supabaseEnv();
+  return createBrowserClient<Database>(url, publishableKey);
 }

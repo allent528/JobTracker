@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { OTP_LENGTH } from "@/lib/schemas/auth";
 
 import { LoginForm } from "./login-form";
 
@@ -15,10 +16,11 @@ export default function LoginPage() {
           <h1 className="text-2xl leading-tight font-semibold tracking-tight">
             Sign in to JobTracker
           </h1>
-          <CardDescription>We&apos;ll email you a sign-in link and a 6-digit code.</CardDescription>
+          <CardDescription>
+            We&apos;ll email you a sign-in link and a {OTP_LENGTH}-digit code.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* The form reads ?next= and ?error=, which is request data. */}
           <Suspense fallback={<div className="h-32" aria-hidden />}>
             <LoginForm />
           </Suspense>

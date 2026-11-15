@@ -1,56 +1,43 @@
 import { expect, type Page, test } from "@playwright/test";
 
+import { OTP_LENGTH } from "../../src/lib/schemas/auth";
 import {
-  adminClient,
   clearInbox,
   countMessages,
   extractCode,
   extractConfirmLink,
+  findUserByEmail,
   latestMessage,
+  NO_ACCOUNT_EMAIL,
   TEST_USERS,
-  UNKNOWN_EMAIL,
 } from "./support/local-env";
+
+const CODE_LABEL = `${OTP_LENGTH}-digit code`;
 
 async function requestEmail(page: Page, email: string) {
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "we sent it a sign-in link and a code",
-  );
+  await expect(page.getByRole("status")).toContainText("we sent it a sign-in link and a code");
 }
 
-async function expectSignedOutRedirect(
-  page: Page,
-  path: string,
-  expectedNext: string | null,
-) {
+async function expectSignedOutRedirect(page: Page, path: string, expectedNext: string | null) {
   await page.goto(path);
   await expect(page).toHaveURL((url) => url.pathname === "/login");
   expect(new URL(page.url()).searchParams.get("next")).toBe(expectedNext);
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Sign in to JobTracker" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to JobTracker" })).toBeVisible();
 }
-
-test("signed-out visits to protected routes redirect to /login", async ({
-  page,
-}) => {
-  await expectSignedOutRedirect(page, "/", null);
-  await expectSignedOutRedirect(
-    page,
-    "/applications?tab=all",
-    "/applications?tab=all",
-  );
-});
 
 async function expectNoHorizontalScroll(page: Page) {
   const overflow = await page.evaluate(
-    () =>
-      document.documentElement.scrollWidth -
-      document.documentElement.clientWidth,
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
 }
+
+test("signed-out visits to protected routes redirect to /login", async ({ page }) => {
+  await expectSignedOutRedirect(page, "/", null);
+  await expectSignedOutRedirect(page, "/applications?tab=all", "/applications?tab=all");
+});
 
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
@@ -59,27 +46,24 @@ test.describe("at phone width", () => {
     const email = TEST_USERS.code;
     await clearInbox(email);
 
-    // An off-site ?next= must be ignored after sign-in (no open redirect).
-    await page.goto("/login?next=//evil.example.com");
+    // Normalizes to //evil.example.com; must not become an open redirect.
+    await page.goto("/login?next=/.//evil.example.com");
     await expectNoHorizontalScroll(page);
     await requestEmail(page, email);
     await expectNoHorizontalScroll(page);
 
-    await page.getByLabel("6-digit code").fill("000000");
+    await page.getByLabel(CODE_LABEL).fill("0".repeat(OTP_LENGTH));
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "wrong or has expired" })).toBeVisible();
 
     const code = extractCode(await latestMessage(email));
-    await page.getByLabel("6-digit code").fill(code);
+    await page.getByLabel(CODE_LABEL).fill(code);
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(
-      page.getByRole("heading", { level: 1, name: "JobTracker" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "JobTracker" })).toBeVisible();
     await expectNoHorizontalScroll(page);
 
-    // Signed in, /login bounces home.
     await page.goto("/login");
     await expect(page).toHaveURL("/");
 
@@ -90,7 +74,7 @@ test.describe("at phone width", () => {
   });
 });
 
-test("sign in with the magic link", async ({ page }) => {
+test("sign in with the magic link, which works only once", async ({ page }) => {
   const email = TEST_USERS.link;
   await clearInbox(email);
 
@@ -100,31 +84,29 @@ test("sign in with the magic link", async ({ page }) => {
   const link = extractConfirmLink(await latestMessage(email));
   await page.goto(link);
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
-
-  // The link is single-use.
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/login");
+
   await page.goto(link);
   await expect(page).toHaveURL("/login?error=link");
-  await expect(page.getByRole("alert").filter({ hasText: "invalid or has expired" })).toBeVisible();
+  const linkError = page.getByRole("alert").filter({ hasText: "invalid or has expired" });
+  await expect(linkError).toBeVisible();
+
+  // A stale ?error=link message must not come back after a new request.
+  await requestEmail(page, email);
+  await page.getByRole("button", { name: "Use a different email" }).click();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(linkError).toHaveCount(0);
 });
 
-test("an unknown email gets the same answer, no email and no account", async ({
-  page,
-}) => {
-  await clearInbox(UNKNOWN_EMAIL);
+test("an unknown email gets the same answer, no email and no account", async ({ page }) => {
+  await clearInbox(NO_ACCOUNT_EMAIL);
 
   await page.goto("/login");
-  await requestEmail(page, UNKNOWN_EMAIL);
+  await requestEmail(page, NO_ACCOUNT_EMAIL);
 
   // Give the auth server time to have sent something, if it were going to.
   await page.waitForTimeout(1500);
-  expect(await countMessages(UNKNOWN_EMAIL)).toBe(0);
-
-  const { data, error } = await adminClient().auth.admin.listUsers({
-    perPage: 1000,
-  });
-  expect(error).toBeNull();
-  expect(data.users.some((user) => user.email === UNKNOWN_EMAIL)).toBe(false);
+  expect(await countMessages(NO_ACCOUNT_EMAIL)).toBe(0);
+  expect(await findUserByEmail(NO_ACCOUNT_EMAIL)).toBeNull();
 });

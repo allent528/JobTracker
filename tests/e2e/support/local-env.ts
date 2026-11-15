@@ -1,12 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 
+import { OTP_LENGTH } from "../../../src/lib/schemas/auth";
+
 /** Fake test users (D4). Each spec uses its own address so parallel tests don't share an inbox. */
 export const TEST_USERS = {
   code: "e2e-code@example.com",
   link: "e2e-link@example.com",
 } as const;
 
-export const UNKNOWN_EMAIL = "e2e-nobody@example.com";
+/** Must never have an account; global setup deletes it if a past run left one. */
+export const NO_ACCOUNT_EMAIL = "e2e-nobody@example.com";
 
 const MAILPIT_URL = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 
@@ -30,40 +33,47 @@ export function adminClient() {
   });
 }
 
+export async function findUserByEmail(email: string) {
+  const { data, error } = await adminClient().auth.admin.listUsers({ perPage: 1000 });
+  if (error) throw error;
+  return data.users.find((user) => user.email === email) ?? null;
+}
+
 type MailpitMessage = { ID: string; Text: string; HTML: string };
 
-function toQuery(email: string) {
-  return new URLSearchParams({ query: `to:"${email}"` }).toString();
+async function mailpit<T = unknown>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${MAILPIT_URL}/api/v1${path}`, init);
+  if (!res.ok) throw new Error(`Mailpit ${init?.method ?? "GET"} ${path} failed: ${res.status}`);
+  return (res.headers.get("content-type")?.includes("json") ? res.json() : res.text()) as Promise<T>;
+}
+
+function searchPath(email: string, extra = "") {
+  return `/search?${new URLSearchParams({ query: `to:"${email}"` })}${extra}`;
 }
 
 export async function clearInbox(email: string) {
-  await fetch(`${MAILPIT_URL}/api/v1/search?${toQuery(email)}`, { method: "DELETE" });
+  await mailpit(searchPath(email), { method: "DELETE" });
 }
 
 export async function countMessages(email: string): Promise<number> {
-  const res = await fetch(`${MAILPIT_URL}/api/v1/search?${toQuery(email)}`);
-  const body = (await res.json()) as { messages_count: number };
+  const body = await mailpit<{ messages_count: number }>(searchPath(email));
   return body.messages_count;
 }
 
-/** Waits for the newest sign-in email to `email` and returns it. */
+/** Waits for the newest email to `email` and returns it. */
 export async function latestMessage(email: string, timeoutMs = 15_000): Promise<MailpitMessage> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const res = await fetch(`${MAILPIT_URL}/api/v1/search?${toQuery(email)}&limit=1`);
-    const { messages } = (await res.json()) as { messages: { ID: string }[] };
-    if (messages.length > 0) {
-      const msg = await fetch(`${MAILPIT_URL}/api/v1/message/${messages[0].ID}`);
-      return (await msg.json()) as MailpitMessage;
-    }
+    const { messages } = await mailpit<{ messages: { ID: string }[] }>(searchPath(email, "&limit=1"));
+    if (messages.length > 0) return mailpit<MailpitMessage>(`/message/${messages[0].ID}`);
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`No email arrived for ${email} within ${timeoutMs}ms.`);
 }
 
 export function extractCode(message: MailpitMessage): string {
-  const match = message.Text.match(/\b(\d{6})\b/);
-  if (!match) throw new Error("No 6-digit code in the sign-in email.");
+  const match = message.Text.match(new RegExp(`\\b(\\d{${OTP_LENGTH}})\\b`));
+  if (!match) throw new Error(`No ${OTP_LENGTH}-digit code in the sign-in email.`);
   return match[1];
 }
 
