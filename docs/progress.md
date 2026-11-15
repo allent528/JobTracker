@@ -84,3 +84,32 @@
 **Follow-ups**
 - Step 2 planning: `next.config.ts` has `cacheComponents: true`, which changes how `cookies()` and dynamic data are accessed (Suspense boundaries); account for it in the `@supabase/ssr` server client and `src/proxy.ts`.
 - Owner to-dos from the plan entry are still open (DB password reset, dashboard sign-ups off + user + `{{ .Token }}` template before step 2, read-only MCP decision).
+
+## 2026-11-14: Launch step 2 (Auth, F1)
+**Status:** Done, pending owner review (branch `feat/auth`)
+**What was done**
+- `@supabase/ssr` clients: `src/lib/supabase/server.ts` (cookies(), server-only), `client.ts` (browser), `proxy.ts` (`updateSession`, request/response cookies + no-cache headers on redirects).
+- `src/proxy.ts`: refreshes the session via `getClaims()` on every non-static request; signed out → `/login?next=<path>`; signed in on `/login` → `/`. Public routes: `/login`, `/auth/confirm` (`src/lib/auth-routes.ts`).
+- `/login` (`src/app/(auth)/login`): email step → `signInWithOtp({ shouldCreateUser: false })`; code step → `verifyOtp({ type: 'email' })`, then redirect to `safeNextPath(next)`. Both are Server Actions with shared Zod schemas (`src/lib/schemas/auth.ts`) and react-hook-form + shadcn form. Unknown emails and 4xx errors get the same "if this email has an account" answer.
+- `/auth/confirm` route: `verifyOtp({ token_hash, type: 'email' })` → same-origin redirect; failures → `/login?error=link`.
+- `(app)/` layout with header (email + Sign out, `signOut({ scope: 'local' })`) and a minimal home page; the old root page moved there. `getCurrentUser()` in `src/lib/auth.ts` (getClaims, `connection()`, React `cache`).
+- Local Supabase: Magic Link template with link + `{{ .Token }}` (`supabase/templates/magic_link.html`), `site_url` now `http://localhost:3000`, redirect allow-list for localhost/127.0.0.1, local `email_sent` rate limit 2 → 100 (e2e).
+- `next.config.ts`: `logging.serverFunctions: false` (dev logged emails and codes).
+- Deps: zod, react-hook-form, @hookform/resolvers (via shadcn `form`), server-only; shadcn input, label, card, form.
+- Tests: unit for `auth-routes` (public paths, open-redirect cases) and auth schemas. Playwright: signed-out redirect (with `next`), code sign-in at 375px (wrong code, off-site `next` ignored, `/login` bounces home, no horizontal scroll, sign-out), magic-link sign-in (and link is single-use), unknown email (generic answer, no mail, no user). Global setup creates fake users via the local admin API; a guard refuses non-local Supabase URLs. `smoke.spec.ts` removed (covered by the auth spec).
+- Rules updated: auth.md (proxy helper, DAL, lessons), testing.md (e2e setup lessons), ui.md (inline error exception for sign-in), CLAUDE.md rules table.
+**Files:** `src/proxy.ts`, `src/lib/supabase/{server,client,proxy}.ts`, `src/lib/{auth,auth-routes,auth-routes.test}.ts`, `src/lib/schemas/{auth,auth.test}.ts`, `src/app/(auth)/login/{page,login-form,actions}.ts(x)`, `src/app/auth/confirm/route.ts`, `src/app/(app)/{layout,page,actions}.ts(x)`, `src/components/ui/{card,form,input,label}.tsx`, `supabase/config.toml`, `supabase/templates/magic_link.html`, `tests/e2e/{auth.spec,global-setup}.ts`, `tests/e2e/support/local-env.ts`, `playwright.config.ts`, `next.config.ts`, `package.json`, `package-lock.json`, `.claude/rules/{auth,testing,ui}.md`, `.claude/CLAUDE.md`, `docs/learnings.md`
+**Checks:** typecheck pass; lint pass; `npm test` 39/39; `npm run build` with the CI placeholder env and no `.env.local` pass (`/` partial prerender, `/login` static, `/auth/confirm` dynamic); `npm run test:e2e` 4/4 against the local stack. Verification and security-reviewer agents not run by this session (handed back to the lead).
+**Decisions / defaults**
+- Sign-in steps run as Server Actions (server client), not in the browser, so validation and the "don't reveal accounts" mapping live on the server.
+- Sign-out is local scope ("ends the session on the device", F1).
+- The magic link always lands on `/`; only the code path honours `?next=` (the email template has no per-request redirect). Fine for one user; revisit if deep links matter.
+- A 429 (rate limit) also shows the generic "check your email" answer, so it can't reveal an account; the owner may wait for an email that isn't coming. Only 5xx/network errors show "couldn't send".
+- Login errors are shown inline (`role="alert"`), not in a toast (no toast library yet).
+**Follow-ups (owner, prod; do at step 9 or before first prod sign-in)**
+- Supabase dashboard → Auth → Sign In / Providers: turn **Allow new users to sign up** off.
+- Add the owner's user (Auth → Users → Add user, auto-confirm).
+- Auth → Email Templates → Magic Link: link `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` plus `{{ .Token }}` (copy `supabase/templates/magic_link.html`); OTP length 6.
+- Auth → URL Configuration: Site URL = the Vercel production URL; redirect URLs = `<prod URL>/**`.
+- Consider custom SMTP: the built-in sender is heavily rate-limited.
+- Still open from step 1: DB password reset, read-only MCP decision.

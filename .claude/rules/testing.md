@@ -22,4 +22,7 @@ paths:
 - A bug fix starts with a failing test (see `validate-fix`).
 
 ## Lessons learned
-- (none yet)
+- E2E setup lives in `tests/e2e/global-setup.ts` (creates confirmed fake users with the admin API) and `tests/e2e/support/local-env.ts` (admin client, Mailpit helpers, a guard that throws unless the Supabase URL is localhost). `playwright.config.ts` loads `.env.local` with `process.loadEnvFile`.
+- Give each spec its own test user/inbox: tests run in parallel and Mailpit searches by recipient.
+- `getByRole("alert")` also matches Next's empty `#__next-route-announcer__`; filter by text (`.filter({ hasText })`).
+- The magic link is built from `site_url` in `supabase/config.toml`, so it must match Playwright's `baseURL` (`http://localhost:3000`); cookies are per host.
