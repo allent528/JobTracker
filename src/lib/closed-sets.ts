@@ -1,5 +1,5 @@
-// Closed sets besides status (which lives in status.ts). Each is mirrored by a check constraint
-// in supabase/migrations (D7); change both in the same PR. check-constraints.test.ts enforces it.
+// Closed sets besides status (which lives in status.ts), each mirrored by a check constraint in
+// supabase/migrations (D7). check-constraints.test.ts keeps them equal.
 export const WORK_MODES = ["onsite", "hybrid", "remote"] as const;
 export type WorkMode = (typeof WORK_MODES)[number];
 

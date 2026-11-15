@@ -50,3 +50,9 @@
 - **Root cause:** The CLI sends the SQL as a single prepared statement.
 - **Fix:** Run statements one per call.
 - **Lesson:** Recorded in `.claude/rules/database.md`.
+
+## 2026-11-14: Unique constraints are checked before foreign keys
+- **Mistake:** An RLS test expected 23503 (FK) when B inserted an interview_contacts row reusing A's existing interview/contact pair, but got 23505 (unique).
+- **Root cause:** Unique indexes are checked while the row is inserted; FK checks run afterwards (as constraint triggers).
+- **Fix:** The test uses a pair that doesn't exist yet, which is the real attack. The leak (whether a pair of known UUIDs is linked) is accepted.
+- **Lesson:** When probing composite FKs, avoid values that also hit a unique constraint. Recorded in `.claude/rules/testing.md`.

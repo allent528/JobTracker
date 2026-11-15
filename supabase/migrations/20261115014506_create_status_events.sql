@@ -1,19 +1,22 @@
 -- status_events (F4, D5): one row per status change, including the initial status on insert.
 -- Written only by the security definer trigger below, in the same transaction as the change.
 -- Clients may read their own rows; nobody but the table owner can insert, update or delete.
+-- changed_at uses clock_timestamp() so events from one transaction still order strictly; stats
+-- (F9) order by changed_at.
 create table public.status_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  application_id uuid not null references public.applications (id) on delete cascade,
+  application_id uuid not null,
   from_status text,
   to_status text not null,
-  changed_at timestamptz not null default now(),
-  created_at timestamptz not null default now()
+  changed_at timestamptz not null default clock_timestamp(),
+  created_at timestamptz not null default now(),
+  constraint status_events_application_fkey foreign key (application_id, user_id)
+    references public.applications (id, user_id) on delete cascade
 );
 
 create index status_events_user_id_idx on public.status_events (user_id);
-create index status_events_application_id_changed_at_idx
-  on public.status_events (application_id, changed_at);
+create index status_events_application_id_user_id_idx on public.status_events (application_id, user_id);
 
 alter table public.status_events enable row level security;
 

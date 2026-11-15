@@ -4,10 +4,8 @@ create schema if not exists private;
 
 revoke all on schema private from public, anon, authenticated;
 
--- New functions in private are not executable by PUBLIC unless granted explicitly.
 alter default privileges in schema private revoke execute on functions from public;
 
--- Keeps updated_at current on every mutable table (attached per table, before update).
 create function private.set_updated_at()
 returns trigger
 language plpgsql

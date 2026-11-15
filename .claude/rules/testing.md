@@ -25,7 +25,8 @@ paths:
 ## RLS suite
 - `npm run test:rls` runs `tests/rls/**/*.test.ts` with `vitest.rls.config.mts` (loads `.env.local`, files run serially). The main `vitest.config.mts` only includes `src/**`, so CI never needs a database.
 - It recreates fake users `rls-a@example.com` / `rls-b@example.com` each run and signs them in with admin `generateLink` + `verifyOtp({ type: "email", token_hash })` (no email involved). It reuses the localhost guard and admin client from `tests/e2e/support/local-env.ts`.
-- Every new table or policy gets attacker-side checks there: B can't read/update/delete A's rows, can't insert under A's parent, can't move rows to A. Expect `42501` for RLS/privilege denials and `23514` for check violations; an RLS-filtered update or delete returns `data: []`, not an error.
+- Every new table or policy gets attacker-side checks there: B can't read/update/delete A's rows, can't insert under A's parent, can't spoof `user_id`, can't re-parent rows. Probe updates with a content column (one the client is granted), or the column privilege error hides what RLS would do.
+- Expected codes: `42501` for RLS denials and missing column privileges (writing `user_id`, `id`, `application_id` on update, any write to `status_events`); `23503` for a child pointed at another user's or another application's parent (composite FKs); `23514` for check violations; `23505` if the unique pair already exists (checked before the FK). An RLS-filtered update or delete returns `data: []`, not an error.
 - `npx supabase db reset` wipes auth users too; Playwright's global setup recreates its own.
 
 ## Lessons learned

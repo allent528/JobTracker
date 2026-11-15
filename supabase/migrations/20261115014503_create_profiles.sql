@@ -1,8 +1,9 @@
 -- profiles: one row per auth user, holding the owner's IANA time zone (F8, D11).
+-- time_zone is null until the app detects it from the browser; server code falls back to UTC.
 -- Created by a trigger on auth.users; clients can read and change only their own time_zone.
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
-  time_zone text not null default 'UTC',
+  time_zone text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -46,10 +47,12 @@ revoke execute on function private.validate_time_zone() from public, anon, authe
 
 create trigger profiles_validate_time_zone
   before insert or update of time_zone on public.profiles
-  for each row execute function private.validate_time_zone();
+  for each row
+  when (new.time_zone is not null)
+  execute function private.validate_time_zone();
 
--- Creates the profile for every new auth user. Security definer: it runs inside GoTrue's
--- insert into auth.users, whose role has no rights on public.profiles.
+-- Security definer: it runs inside GoTrue's insert into auth.users, whose role has no rights on
+-- public.profiles.
 create function private.handle_new_user()
 returns trigger
 language plpgsql

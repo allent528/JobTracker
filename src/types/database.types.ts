@@ -32,37 +32,43 @@ export type Database = {
                   }
                   Relationships: [
                     {
-      foreignKeyName: "contacts_application_id_fkey"
-      columns: ["application_id"]
+      foreignKeyName: "contacts_application_fkey"
+      columns: ["application_id","user_id"]
 isOneToOne: false
       referencedRelation: "applications"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","user_id"]
     }
                   ]
                 },"interview_contacts": {
                   Row: {
-                    "contact_id": string,"created_at": string,"id": string,"interview_id": string,"user_id": string
+                    "application_id": string,"contact_id": string,"created_at": string,"id": string,"interview_id": string,"user_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "contact_id": string,"created_at"?: string,"id"?: string,"interview_id": string,"user_id"?: string
+                    "application_id": string,"contact_id": string,"created_at"?: string,"id"?: string,"interview_id": string,"user_id"?: string
                   }
                   Update: {
-                    "contact_id"?: string,"created_at"?: string,"id"?: string,"interview_id"?: string,"user_id"?: string
+                    "application_id"?: string,"contact_id"?: string,"created_at"?: string,"id"?: string,"interview_id"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
-      foreignKeyName: "interview_contacts_contact_id_fkey"
-      columns: ["contact_id"]
+      foreignKeyName: "interview_contacts_application_fkey"
+      columns: ["application_id","user_id"]
+isOneToOne: false
+      referencedRelation: "applications"
+      referencedColumns: ["id","user_id"]
+    },{
+      foreignKeyName: "interview_contacts_contact_fkey"
+      columns: ["contact_id","application_id"]
 isOneToOne: false
       referencedRelation: "contacts"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","application_id"]
     },{
-      foreignKeyName: "interview_contacts_interview_id_fkey"
-      columns: ["interview_id"]
+      foreignKeyName: "interview_contacts_interview_fkey"
+      columns: ["interview_id","application_id"]
 isOneToOne: false
       referencedRelation: "interviews"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","application_id"]
     }
                   ]
                 },"interviews": {
@@ -78,11 +84,11 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "interviews_application_id_fkey"
-      columns: ["application_id"]
+      foreignKeyName: "interviews_application_fkey"
+      columns: ["application_id","user_id"]
 isOneToOne: false
       referencedRelation: "applications"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","user_id"]
     }
                   ]
                 },"notes": {
@@ -98,23 +104,23 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "notes_application_id_fkey"
-      columns: ["application_id"]
+      foreignKeyName: "notes_application_fkey"
+      columns: ["application_id","user_id"]
 isOneToOne: false
       referencedRelation: "applications"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","user_id"]
     }
                   ]
                 },"profiles": {
                   Row: {
-                    "created_at": string,"id": string,"time_zone": string,"updated_at": string
+                    "created_at": string,"id": string,"time_zone": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"id": string,"time_zone"?: string,"updated_at"?: string
+                    "created_at"?: string,"id": string,"time_zone"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"id"?: string,"time_zone"?: string,"updated_at"?: string
+                    "created_at"?: string,"id"?: string,"time_zone"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -132,11 +138,11 @@ isOneToOne: false
                   }
                   Relationships: [
                     {
-      foreignKeyName: "status_events_application_id_fkey"
-      columns: ["application_id"]
+      foreignKeyName: "status_events_application_fkey"
+      columns: ["application_id","user_id"]
 isOneToOne: false
       referencedRelation: "applications"
-      referencedColumns: ["id"]
+      referencedColumns: ["id","user_id"]
     }
                   ]
                 }

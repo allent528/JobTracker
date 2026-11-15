@@ -2,19 +2,21 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { INTERVIEW_KINDS, INTERVIEW_OUTCOMES, WORK_MODES } from "@/lib/closed-sets";
+import { TEXT_LIMITS } from "@/lib/limits";
 import { STATUSES } from "@/lib/status";
-import type { Database } from "@/types/database.types";
+import type { Database, TablesUpdate } from "@/types/database.types";
 
 import { adminClient, findUserByEmail, localSupabaseUrl } from "../e2e/support/local-env";
 
 type Client = SupabaseClient<Database>;
-type ChildTable = "notes" | "contacts" | "interviews" | "interview_contacts" | "status_events";
 
 // Fake users for these checks only; recreated each run so every row below is fresh.
 const USER_A = "rls-a@example.com";
 const USER_B = "rls-b@example.com";
 
-const RLS_VIOLATION = "42501";
+// Postgres error codes as returned by PostgREST.
+const DENIED = "42501"; // RLS violation or missing (column) privilege
+const FK_VIOLATION = "23503";
 const CHECK_VIOLATION = "23514";
 
 function publishableKey(): string {
@@ -32,7 +34,10 @@ function newClient(): Client {
 async function recreateUser(email: string): Promise<string> {
   const admin = adminClient();
   const existing = await findUserByEmail(email);
-  if (existing) await admin.auth.admin.deleteUser(existing.id);
+  if (existing) {
+    const { error } = await admin.auth.admin.deleteUser(existing.id);
+    if (error) throw error;
+  }
   const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
   if (error) throw error;
   return data.user.id;
@@ -51,8 +56,7 @@ async function signedInClient(email: string): Promise<Client> {
   return client;
 }
 
-/** Throws on error; returns the single row. */
-function one<T>(result: { data: T; error: unknown }): NonNullable<T> {
+function rowOrThrow<T>(result: { data: T; error: unknown }): NonNullable<T> {
   if (result.error) throw result.error;
   if (result.data === null || result.data === undefined) throw new Error("expected a row");
   return result.data;
@@ -61,30 +65,30 @@ function one<T>(result: { data: T; error: unknown }): NonNullable<T> {
 type Fixture = { applicationId: string; noteId: string; contactId: string; interviewId: string; linkId: string };
 
 async function createFixture(client: Client, company: string): Promise<Fixture> {
-  const app = one(
+  const app = rowOrThrow(
     await client.from("applications").insert({ company, role_title: "Software Engineer" }).select("id").single(),
   );
-  const note = one(
+  const note = rowOrThrow(
     await client.from("notes").insert({ application_id: app.id, body: "Fake note" }).select("id").single(),
   );
-  const contact = one(
+  const contact = rowOrThrow(
     await client
       .from("contacts")
       .insert({ application_id: app.id, name: "Jane Doe", email: "jane@example.com", phone: "555-0100" })
       .select("id")
       .single(),
   );
-  const interview = one(
+  const interview = rowOrThrow(
     await client
       .from("interviews")
       .insert({ application_id: app.id, kind: "phone_screen", scheduled_at: "2026-12-01T15:00:00Z" })
       .select("id")
       .single(),
   );
-  const link = one(
+  const link = rowOrThrow(
     await client
       .from("interview_contacts")
-      .insert({ interview_id: interview.id, contact_id: contact.id })
+      .insert({ application_id: app.id, interview_id: interview.id, contact_id: contact.id })
       .select("id")
       .single(),
   );
@@ -96,10 +100,22 @@ async function eventsFor(client: Client, applicationId: string) {
     .from("status_events")
     .select("from_status, to_status")
     .eq("application_id", applicationId)
-    .order("changed_at")
-    .order("created_at");
+    .order("changed_at");
   if (error) throw error;
   return data;
+}
+
+async function accessToken(client: Client): Promise<string> {
+  const { data } = await client.auth.getSession();
+  if (!data.session) throw new Error("not signed in");
+  return data.session.access_token;
+}
+
+/** Today's date (YYYY-MM-DD) in an IANA time zone. */
+function todayIn(timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date(),
+  );
 }
 
 let a: Client;
@@ -121,10 +137,10 @@ beforeAll(async () => {
 });
 
 describe("profiles", () => {
-  it("are created on sign-up with UTC and visible only to their owner", async () => {
+  it("are created on sign-up with no time zone yet, visible only to their owner", async () => {
     const { data, error } = await a.from("profiles").select("id, time_zone");
     expect(error).toBeNull();
-    expect(data).toEqual([{ id: userA, time_zone: "UTC" }]);
+    expect(data).toEqual([{ id: userA, time_zone: null }]);
   });
 
   it("accept a valid IANA time zone and reject an unknown one", async () => {
@@ -136,115 +152,197 @@ describe("profiles", () => {
     expect(bad.error?.message).toBe("invalid_time_zone");
   });
 
+  it("can't change their id", async () => {
+    const { error } = await a.from("profiles").update({ id: userB }).eq("id", userA);
+    expect(error?.code).toBe(DENIED);
+  });
+
   it("can't be changed, created or deleted by another user", async () => {
     const update = await b.from("profiles").update({ time_zone: "Europe/Paris" }).eq("id", userA).select();
     expect(update.data).toEqual([]);
 
     const insert = await b.from("profiles").insert({ id: userB });
-    expect(insert.error?.code).toBe(RLS_VIOLATION);
+    expect(insert.error?.code).toBe(DENIED);
 
     const del = await b.from("profiles").delete().eq("id", userA);
-    expect(del.error?.code).toBe(RLS_VIOLATION);
+    expect(del.error?.code).toBe(DENIED);
 
-    const own = one(await a.from("profiles").select("time_zone").eq("id", userA).single());
+    const own = rowOrThrow(await a.from("profiles").select("time_zone").eq("id", userA).single());
     expect(own.time_zone).toBe("America/New_York");
   });
 });
 
 describe("user B can't touch user A's rows", () => {
-  const ids = (f: Fixture): Record<"applications" | Exclude<ChildTable, "status_events">, string> => ({
-    applications: f.applicationId,
-    notes: f.noteId,
-    contacts: f.contactId,
-    interviews: f.interviewId,
-    interview_contacts: f.linkId,
+  it("applications: no read, update or delete", async () => {
+    const id = fa.applicationId;
+    expect((await b.from("applications").select("id").eq("id", id)).data).toEqual([]);
+    expect((await b.from("applications").update({ company: "Hacked" }).eq("id", id).select("id")).data).toEqual([]);
+    expect((await b.from("applications").delete().eq("id", id).select("id")).data).toEqual([]);
+    expect(rowOrThrow(await a.from("applications").select("company").eq("id", id).single()).company).toBe("Acme Corp");
   });
 
-  it.each(["applications", "notes", "contacts", "interviews", "interview_contacts"] as const)(
-    "%s: no read, update or delete",
-    async (table) => {
-      const id = ids(fa)[table];
+  it("notes: no read, update or delete", async () => {
+    const id = fa.noteId;
+    expect((await b.from("notes").select("id").eq("id", id)).data).toEqual([]);
+    expect((await b.from("notes").update({ body: "Hacked" }).eq("id", id).select("id")).data).toEqual([]);
+    expect((await b.from("notes").delete().eq("id", id).select("id")).data).toEqual([]);
+    expect(rowOrThrow(await a.from("notes").select("body").eq("id", id).single()).body).toBe("Fake note");
+  });
 
-      const read = await b.from(table).select("id").eq("id", id);
-      expect(read.data).toEqual([]);
+  it("contacts: no read, update or delete", async () => {
+    const id = fa.contactId;
+    expect((await b.from("contacts").select("id").eq("id", id)).data).toEqual([]);
+    expect((await b.from("contacts").update({ name: "Hacked" }).eq("id", id).select("id")).data).toEqual([]);
+    expect((await b.from("contacts").delete().eq("id", id).select("id")).data).toEqual([]);
+    expect(rowOrThrow(await a.from("contacts").select("name").eq("id", id).single()).name).toBe("Jane Doe");
+  });
 
-      if (table !== "interview_contacts") {
-        const update = await b.from(table).update({ created_at: "2000-01-01T00:00:00Z" }).eq("id", id).select("id");
-        expect(update.data).toEqual([]);
-      }
+  it("interviews: no read, update or delete", async () => {
+    const id = fa.interviewId;
+    expect((await b.from("interviews").select("id").eq("id", id)).data).toEqual([]);
+    expect((await b.from("interviews").update({ notes: "Hacked" }).eq("id", id).select("id")).data).toEqual([]);
+    expect((await b.from("interviews").delete().eq("id", id).select("id")).data).toEqual([]);
+    expect(rowOrThrow(await a.from("interviews").select("notes").eq("id", id).single()).notes).toBeNull();
+  });
 
-      const del = await b.from(table).delete().eq("id", id).select("id");
-      expect(del.data).toEqual([]);
+  it("interview_contacts: no read or delete", async () => {
+    const id = fa.linkId;
+    expect((await b.from("interview_contacts").select("id").eq("id", id)).data).toEqual([]);
+    expect((await b.from("interview_contacts").delete().eq("id", id).select("id")).data).toEqual([]);
+    expect((await a.from("interview_contacts").select("id").eq("id", id)).data).toEqual([{ id }]);
+  });
 
-      const stillThere = await a.from(table).select("id").eq("id", id);
-      expect(stillThere.data).toEqual([{ id }]);
-    },
-  );
-
-  it("status_events: no read", async () => {
+  it("status_events: only the owner can read", async () => {
     expect(await eventsFor(b, fa.applicationId)).toEqual([]);
     expect((await eventsFor(a, fa.applicationId)).length).toBeGreaterThan(0);
   });
 
-  it("can't insert rows owned by A, or children under A's application", async () => {
+  it("can't create rows owned by A or under A's application", async () => {
     const asA = await b.from("applications").insert({ company: "Acme Corp", role_title: "Spy", user_id: userA });
-    expect(asA.error?.code).toBe(RLS_VIOLATION);
+    expect(asA.error?.code).toBe(DENIED);
+
+    const upsert = await b
+      .from("applications")
+      .upsert({ id: fa.applicationId, company: "Hacked", role_title: "Spy" });
+    expect(upsert.error?.code).toBe(DENIED);
 
     const note = await b.from("notes").insert({ application_id: fa.applicationId, body: "Sneaky" });
-    expect(note.error?.code).toBe(RLS_VIOLATION);
+    expect(note.error?.code).toBe(FK_VIOLATION);
 
     const contact = await b.from("contacts").insert({ application_id: fa.applicationId, name: "John Doe" });
-    expect(contact.error?.code).toBe(RLS_VIOLATION);
+    expect(contact.error?.code).toBe(FK_VIOLATION);
 
     const interview = await b
       .from("interviews")
       .insert({ application_id: fa.applicationId, kind: "other", scheduled_at: "2026-12-01T15:00:00Z" });
-    expect(interview.error?.code).toBe(RLS_VIOLATION);
+    expect(interview.error?.code).toBe(FK_VIOLATION);
 
-    const link = await b.from("interview_contacts").insert({ interview_id: fa.interviewId, contact_id: fb.contactId });
-    expect(link.error?.code).toBe(RLS_VIOLATION);
+    const linkUnderA = await b
+      .from("interview_contacts")
+      .insert({ application_id: fa.applicationId, interview_id: fa.interviewId, contact_id: fb.contactId });
+    expect(linkUnderA.error?.code).toBe(FK_VIOLATION);
+
+    const ownInterviewAsContact = await b
+      .from("interview_contacts")
+      .insert({ application_id: fb.applicationId, interview_id: fb.interviewId, contact_id: fa.contactId });
+    expect(ownInterviewAsContact.error?.code).toBe(FK_VIOLATION);
   });
 
-  it("can't move its own rows to A or under A's application", async () => {
-    const reassign = await b.from("applications").update({ user_id: userA }).eq("id", fb.applicationId);
-    expect(reassign.error?.code).toBe(RLS_VIOLATION);
+  it("can't spoof user_id on child rows", async () => {
+    const inserts = [
+      await b.from("notes").insert({ application_id: fa.applicationId, body: "Sneaky", user_id: userA }),
+      await b.from("contacts").insert({ application_id: fa.applicationId, name: "John Doe", user_id: userA }),
+      await b.from("interviews").insert({
+        application_id: fa.applicationId,
+        kind: "other",
+        scheduled_at: "2026-12-01T15:00:00Z",
+        user_id: userA,
+      }),
+      await b.from("interview_contacts").insert({
+        application_id: fa.applicationId,
+        interview_id: fa.interviewId,
+        contact_id: fa.contactId,
+        user_id: userA,
+      }),
+    ];
+    for (const { error } of inserts) expect(error?.code).toBe(DENIED);
 
-    for (const [table, id] of [
-      ["notes", fb.noteId],
-      ["contacts", fb.contactId],
-      ["interviews", fb.interviewId],
-    ] as const) {
-      const move = await b.from(table).update({ application_id: fa.applicationId }).eq("id", id);
-      expect(move.error?.code, table).toBe(RLS_VIOLATION);
+    for (const table of ["applications", "notes", "contacts", "interviews"] as const) {
+      const id = { applications: fb.applicationId, notes: fb.noteId, contacts: fb.contactId, interviews: fb.interviewId }[
+        table
+      ];
+      const { error } = await b.from(table).update({ user_id: userA }).eq("id", id);
+      expect(error?.code, table).toBe(DENIED);
     }
   });
 
   it("anon sees and writes nothing", async () => {
-    for (const table of ["profiles", "applications", "notes", "contacts", "interviews", "interview_contacts", "status_events"] as const) {
+    for (const table of [
+      "profiles",
+      "applications",
+      "notes",
+      "contacts",
+      "interviews",
+      "interview_contacts",
+      "status_events",
+    ] as const) {
       const read = await anon.from(table).select("id");
-      expect(read.error?.code, table).toBe(RLS_VIOLATION);
+      expect(read.error?.code, table).toBe(DENIED);
     }
     const insert = await anon.from("applications").insert({ company: "Acme Corp", role_title: "Anon" });
-    expect(insert.error?.code).toBe(RLS_VIOLATION);
+    expect(insert.error?.code).toBe(DENIED);
   });
 });
 
-describe("interview_contacts", () => {
-  it("rejects a contact from a different application of the same user", async () => {
+describe("parent links are fixed after insert", () => {
+  it("notes, contacts and interviews can't move to another application, even the user's own", async () => {
     const other = await createFixture(a, "Initech");
-    const link = await a.from("interview_contacts").insert({ interview_id: fa.interviewId, contact_id: other.contactId });
-    expect(link.error?.code).toBe(RLS_VIOLATION);
+    for (const [table, id] of [
+      ["notes", fa.noteId],
+      ["contacts", fa.contactId],
+      ["interviews", fa.interviewId],
+    ] as const) {
+      const { error } = await a.from(table).update({ application_id: other.applicationId }).eq("id", id);
+      expect(error?.code, table).toBe(DENIED);
+    }
   });
 
-  it("can't be updated", async () => {
+  it("interview_contacts reject a contact from another application of the same user", async () => {
+    const other = await createFixture(a, "Initrode");
+    const link = await a
+      .from("interview_contacts")
+      .insert({ application_id: fa.applicationId, interview_id: fa.interviewId, contact_id: other.contactId });
+    expect(link.error?.code).toBe(FK_VIOLATION);
+  });
+
+  it("interview_contacts can't be updated", async () => {
     const update = await a.from("interview_contacts").update({ contact_id: fa.contactId }).eq("id", fa.linkId);
-    expect(update.error?.code).toBe(RLS_VIOLATION);
+    expect(update.error?.code).toBe(DENIED);
+  });
+});
+
+describe("private functions", () => {
+  it.each(["log_status_event", "handle_new_user", "set_date_applied"])("%s is not callable over the API", async (fn) => {
+    const token = await accessToken(a);
+    for (const headers of [{ "Content-Profile": "private" }, {}] as Record<string, string>[]) {
+      const res = await fetch(`${localSupabaseUrl()}/rest/v1/rpc/${fn}`, {
+        method: "POST",
+        headers: {
+          apikey: publishableKey(),
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          ...headers,
+        },
+        body: "{}",
+      });
+      expect([404, 406], JSON.stringify(headers)).toContain(res.status);
+    }
   });
 });
 
 describe("status_events", () => {
   it("logs the initial status, each change, and not no-op updates", async () => {
-    const app = one(
+    const app = rowOrThrow(
       await a
         .from("applications")
         .insert({ company: "Umbrella Co", role_title: "Engineer", status: "applied", date_applied: "2026-11-01" })
@@ -269,20 +367,49 @@ describe("status_events", () => {
     const insert = await a
       .from("status_events")
       .insert({ user_id: userA, application_id: fa.applicationId, from_status: "saved", to_status: "offer" });
-    expect(insert.error?.code).toBe(RLS_VIOLATION);
+    expect(insert.error?.code).toBe(DENIED);
 
     const update = await a.from("status_events").update({ to_status: "offer" }).eq("application_id", fa.applicationId);
-    expect(update.error?.code).toBe(RLS_VIOLATION);
+    expect(update.error?.code).toBe(DENIED);
 
     const del = await a.from("status_events").delete().eq("application_id", fa.applicationId);
-    expect(del.error?.code).toBe(RLS_VIOLATION);
+    expect(del.error?.code).toBe(DENIED);
 
     const anonInsert = await anon
       .from("status_events")
       .insert({ user_id: userA, application_id: fa.applicationId, to_status: "offer" });
-    expect(anonInsert.error?.code).toBe(RLS_VIOLATION);
+    expect(anonInsert.error?.code).toBe(DENIED);
 
     expect(await eventsFor(a, fa.applicationId)).toEqual([{ from_status: null, to_status: "saved" }]);
+  });
+});
+
+describe("date_applied (F4)", () => {
+  // User A's profile time zone is America/New_York (set in the profiles tests).
+  const insertApp = (patch: { status?: "saved" | "applied"; date_applied?: string }) =>
+    a
+      .from("applications")
+      .insert({ company: "Soylent Corp", role_title: "Engineer", ...patch })
+      .select("id, date_applied")
+      .single();
+
+  it("is set to today in the owner's time zone when created as applied without one", async () => {
+    const app = rowOrThrow(await insertApp({ status: "applied" }));
+    expect(app.date_applied).toBe(todayIn("America/New_York"));
+  });
+
+  it("is set when moving to applied without one", async () => {
+    const app = rowOrThrow(await insertApp({ status: "saved" }));
+    expect(app.date_applied).toBeNull();
+    const moved = rowOrThrow(
+      await a.from("applications").update({ status: "applied" }).eq("id", app.id).select("date_applied").single(),
+    );
+    expect(moved.date_applied).toBe(todayIn("America/New_York"));
+  });
+
+  it("keeps an explicit date", async () => {
+    const app = rowOrThrow(await insertApp({ status: "applied", date_applied: "2026-10-15" }));
+    expect(app.date_applied).toBe("2026-10-15");
   });
 });
 
@@ -313,7 +440,7 @@ describe("check constraints", () => {
       { salary_currency: "usd" },
       { job_url: "javascript:alert(1)" },
       { company: "   " },
-    ];
+    ] satisfies TablesUpdate<"applications">[];
     for (const patch of bad) {
       const { error } = await a.from("applications").update(patch).eq("id", fa.applicationId);
       expect(error?.code, JSON.stringify(patch)).toBe(CHECK_VIOLATION);
@@ -329,10 +456,24 @@ describe("check constraints", () => {
     for (const outcome of INTERVIEW_OUTCOMES) {
       expect((await a.from("interviews").update({ outcome }).eq("id", fa.interviewId)).error).toBeNull();
     }
-    for (const patch of [{ kind: "lunch" }, { outcome: "maybe" }, { duration_minutes: 0 }]) {
+    const bad = [{ kind: "lunch" }, { outcome: "maybe" }, { duration_minutes: 0 }] satisfies TablesUpdate<"interviews">[];
+    for (const patch of bad) {
       const { error } = await a.from("interviews").update(patch).eq("id", fa.interviewId);
       expect(error?.code, JSON.stringify(patch)).toBe(CHECK_VIOLATION);
     }
+  });
+
+  it("enforce text length limits", async () => {
+    const max = TEXT_LIMITS.applications.company;
+    const atLimit = await a.from("applications").update({ company: "x".repeat(max) }).eq("id", fa.applicationId);
+    expect(atLimit.error).toBeNull();
+    const over = await a.from("applications").update({ company: "x".repeat(max + 1) }).eq("id", fa.applicationId);
+    expect(over.error?.code).toBe(CHECK_VIOLATION);
+    const note = await a
+      .from("notes")
+      .update({ body: "x".repeat(TEXT_LIMITS.notes.body + 1) })
+      .eq("id", fa.noteId);
+    expect(note.error?.code).toBe(CHECK_VIOLATION);
   });
 });
 

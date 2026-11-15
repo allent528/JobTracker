@@ -22,6 +22,7 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 - Keyboard accessible: the board has a non-drag way to change status (a select or menu on each card). WCAG 2.1 AA contrast in light and dark.
 - No analytics, tracking pixels, or third-party scripts/embeds.
 - Destructive actions (delete application, contact, interview) need a confirm dialog; archive does not.
+- `interviews.location` is free text that may hold a video link. Render it as a link only if it matches `^https?://`; otherwise show plain text. (`job_url` and `linkedin_url` are already limited to http(s) by the database.)
 
 ## Lessons learned
 - (none yet)
