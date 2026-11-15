@@ -54,5 +54,5 @@
 ## 2026-11-14: Unique constraints are checked before foreign keys
 - **Mistake:** An RLS test expected 23503 (FK) when B inserted an interview_contacts row reusing A's existing interview/contact pair, but got 23505 (unique).
 - **Root cause:** Unique indexes are checked while the row is inserted; FK checks run afterwards (as constraint triggers).
-- **Fix:** The test uses a pair that doesn't exist yet, which is the real attack. The leak (whether a pair of known UUIDs is linked) is accepted.
-- **Lesson:** When probing composite FKs, avoid values that also hit a unique constraint. Recorded in `.claude/rules/testing.md`.
+- **Fix:** That ordering was a small existence oracle (someone knowing both UUIDs could tell whether another user had linked them). The security re-review closed it: the key is now `unique (user_id, interview_id, contact_id)`, so a forged pair never collides and always fails the FK with 23503. Tests cover insert and `upsert(..., { ignoreDuplicates: true })` of an existing pair.
+- **Lesson:** Lead unique keys on user-owned rows with `user_id`. Recorded in `.claude/rules/database.md` and `testing.md`.

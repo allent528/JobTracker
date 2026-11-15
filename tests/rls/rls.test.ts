@@ -242,6 +242,14 @@ describe("user B can't touch user A's rows", () => {
       .insert({ application_id: fa.applicationId, interview_id: fa.interviewId, contact_id: fb.contactId });
     expect(linkUnderA.error?.code).toBe(FK_VIOLATION);
 
+    const existingPair = { application_id: fb.applicationId, interview_id: fa.interviewId, contact_id: fa.contactId };
+    const pairInsert = await b.from("interview_contacts").insert(existingPair);
+    expect(pairInsert.error?.code).toBe(FK_VIOLATION);
+    const pairUpsert = await b
+      .from("interview_contacts")
+      .upsert(existingPair, { onConflict: "user_id,interview_id,contact_id", ignoreDuplicates: true });
+    expect(pairUpsert.error?.code).toBe(FK_VIOLATION);
+
     const ownInterviewAsContact = await b
       .from("interview_contacts")
       .insert({ application_id: fb.applicationId, interview_id: fb.interviewId, contact_id: fa.contactId });

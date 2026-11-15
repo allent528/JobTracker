@@ -8,7 +8,8 @@ create table public.interview_contacts (
   interview_id uuid not null,
   contact_id uuid not null,
   created_at timestamptz not null default now(),
-  constraint interview_contacts_unique unique (interview_id, contact_id),
+  -- user_id leads so another user's pair can never collide: a forged link always fails the FKs.
+  constraint interview_contacts_unique unique (user_id, interview_id, contact_id),
   constraint interview_contacts_application_fkey foreign key (application_id, user_id)
     references public.applications (id, user_id) on delete cascade,
   constraint interview_contacts_interview_fkey foreign key (interview_id, application_id)
