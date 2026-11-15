@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUSES, STATUS_META, nextSuggestedStatus } from "./status";
+import {
+  ACTIVE_STATUSES,
+  CLOSED_STATUSES,
+  isStatus,
+  nextSuggestedStatus,
+  STATUS_META,
+  STATUSES,
+} from "./status";
 
 describe("status", () => {
   it("lists the nine PRD statuses in lifecycle order", () => {
@@ -34,5 +41,12 @@ describe("status", () => {
     expect(nextSuggestedStatus("accepted")).toBeNull();
     expect(nextSuggestedStatus("rejected")).toBeNull();
     expect(nextSuggestedStatus("ghosted")).toBeNull();
+  });
+});
+
+describe("isStatus", () => {
+  it("recognizes statuses", () => {
+    expect(isStatus("applied")).toBe(true);
+    expect(isStatus("hired")).toBe(false);
   });
 });

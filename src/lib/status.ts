@@ -36,3 +36,8 @@ export function nextSuggestedStatus(status: Status): Status | null {
   const i = FORWARD_PATH.indexOf(status);
   return i === -1 || i === FORWARD_PATH.length - 1 ? null : FORWARD_PATH[i + 1];
 }
+
+export function isStatus(value: string): value is Status {
+  return (STATUSES as readonly string[]).includes(value);
+}
+

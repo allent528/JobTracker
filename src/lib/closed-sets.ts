@@ -8,3 +8,9 @@ export type InterviewKind = (typeof INTERVIEW_KINDS)[number];
 
 export const INTERVIEW_OUTCOMES = ["pending", "passed", "failed", "cancelled"] as const;
 export type InterviewOutcome = (typeof INTERVIEW_OUTCOMES)[number];
+
+export const WORK_MODE_LABELS = {
+  onsite: "Onsite",
+  hybrid: "Hybrid",
+  remote: "Remote",
+} as const satisfies Record<WorkMode, string>;

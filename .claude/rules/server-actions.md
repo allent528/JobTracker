@@ -21,4 +21,7 @@ paths:
 - Don't log row contents (contacts, salaries, notes) to the console or error reports.
 
 ## Lessons learned
-- (none yet)
+- Reads go through `src/lib/application-queries.ts` (server-only). Every query filters by `user_id` as well as RLS. `getApplicationOrNotFound` also validates the id with Zod and calls `notFound()` for a bad, missing or foreign id.
+- Stored `status` / `work_mode` text is narrowed to `Status` / `WorkMode` once, in application-queries.ts (safe because of the check constraints and check-constraints.test.ts). Code past that boundary takes `Status`; `isStatus` is only for untrusted input.
+- Updates and deletes of an owned row go through `updateOwnApplication` / `deleteOwnApplication` in `actions.ts`, which chain `.select("id").maybeSingle()`: an RLS-filtered write returns no row rather than an error, so `null` becomes `APPLICATION_NOT_FOUND`. Input is parsed with `parseOr(schema, input)`. Step 6 can lift these to a table-generic helper.
+- Map write errors with `writeErrorMessage()` (`src/lib/db-errors.ts`); never return or log the database message, which can quote row values.

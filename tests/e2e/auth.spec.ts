@@ -61,7 +61,7 @@ test.describe("at phone width", () => {
     await page.getByRole("button", { name: "Sign in" }).click();
 
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { level: 1, name: "JobTracker" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     await expectNoHorizontalScroll(page);
 
     await page.goto("/login");
