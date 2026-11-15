@@ -18,10 +18,10 @@ The PRD above is the source of truth for *what* to build, including the settled 
 ```
 src/app/             Next.js routes (App Router); (auth)/login, (app)/ for signed-in pages
 src/components/      shared UI; src/components/ui/ is shadcn-generated
-src/lib/             domain logic and helpers: status.ts (status constant), supabase/ (server + browser clients), dates.ts
+src/lib/             domain logic and helpers: status.ts (status constant), closed-sets.ts (work mode, interview kind/outcome), supabase/ (server + browser clients), dates.ts
 src/types/           database.types.ts (generated, never hand-edit)
 supabase/            migrations/, seed.sql (fake data only), config.toml
-tests/               e2e/ (Playwright); unit tests sit next to source as *.test.ts
+tests/               e2e/ (Playwright), rls/ (local-stack RLS checks); unit tests sit next to source as *.test.ts
 docs/                prd/, progress.md, learnings.md, negative-constraints.md
 scripts/             project scripts (precommit.mjs, checks)
 ```
@@ -35,6 +35,8 @@ Run from the repo root.
 - Build: `npm run build` (CI runs it with placeholder env)
 - Unit tests: `npm test` → `vitest run`
 - E2E: `npm run test:e2e` → `playwright test`
+- RLS checks: `npm run test:rls` → `vitest run --config vitest.rls.config.mts` (local stack only; not in CI)
+- DB advisors (local): `npx supabase db advisors --type all --level info` and `npx supabase db lint --schema public,private`
 - Local Supabase: `npx supabase start` / `npx supabase stop` (needs Docker Desktop running); `npx supabase db reset` reapplies all migrations + seed locally
 - DB types: `npm run db:types` (generated from the local stack)
 - New migration: `npx supabase migration new <snake_case_name>`; apply only via the `db-migration` skill.

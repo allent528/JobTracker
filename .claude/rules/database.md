@@ -11,7 +11,8 @@ Any change here follows the `db-migration` skill.
 - Create with `npx supabase migration new <snake_case_name>`. Never hand-name files, and never edit a migration that has been pushed. Write a new one instead.
 - One concern per migration (e.g. `create_orders`, `orders_rls`, `checkout_fn`). Keep them small enough to review.
 - Applying to a hosted project is a remote change. Get the owner's OK before `npx supabase db push` or the MCP `apply_migration`.
-- After every schema change: regenerate types and run the Supabase advisors (MCP `get_advisors`). Fix warnings before moving on.
+- After every schema change: regenerate types and run the advisors **locally**: `npx supabase db advisors --type all --level info` and `npx supabase db lint --schema public,private`. Fix warnings before moving on. (The Supabase MCP in `.mcp.json` points at prod; don't use it for dev checks.) `unused_index` INFO on a fresh local DB is expected.
+- `npx supabase db query` takes one statement per call (multiple commands fail as a prepared statement).
 
 ## Conventions
 - Table and column names are snake_case and plural, matching the PRD data model.
@@ -31,7 +32,11 @@ Any change here follows the `db-migration` skill.
 - Tables in the `supabase_realtime` publication leak through RLS exactly like SELECT.
 
 ## JobTracker specifics
-- Every table has `user_id uuid not null default (select auth.uid()) references auth.users(id) on delete cascade` and an index on it (D8). Child tables also carry `application_id ... on delete cascade`, and their insert/update policies check the parent application belongs to the same user.
+- Every table has `user_id uuid not null default auth.uid() references auth.users(id) on delete cascade` and an index on it (D8). (Postgres rejects a subquery in `DEFAULT`, so the default is the bare call; policies still use `(select auth.uid())`.) Exceptions: `profiles` uses `id` as the user id, and `status_events.user_id` has no default because only the trigger writes it. Child tables also carry `application_id ... on delete cascade`, and their insert/update policies check the parent application belongs to the same user.
+- Each creating migration does `revoke all on table … from anon, authenticated` and then grants `authenticated` only what it needs (column-level where possible, e.g. `grant update (time_zone)` on profiles). Don't rely on Supabase's default grants: they include TRUNCATE (which skips RLS) and may differ on the hosted project.
+- Trigger functions live in the unexposed `private` schema (no usage for clients, execute revoked from public/anon/authenticated). Triggers still fire for `authenticated` callers.
+- Closed sets other than status mirror `src/lib/closed-sets.ts` (`WORK_MODES`, `INTERVIEW_KINDS`, `INTERVIEW_OUTCOMES`). Write each as `constraint <name> check (<col> in ('a', 'b'))` on one constraint: `src/lib/check-constraints.test.ts` parses that shape from the migrations.
+- Links rendered as `href` (`job_url`, `linkedin_url`) have an `^https?://` check, so a stored `javascript:` URL can't exist.
 - `status_events` is written **only** by the `after insert or update of status` trigger on `applications` (D5): a `security definer` function with `set search_path = ''`. Clients get a select policy only; no insert, update or delete policy for anyone. Guard with `when (old.status is distinct from new.status)` on update.
 - Transitions are not enforced (D6): no transition checks in SQL.
 - `profiles` row is created by a trigger on `auth.users` insert; `time_zone` defaults to `UTC` and is validated by a `before insert or update` trigger against `pg_timezone_names` (a check constraint can't query a table), plus Zod in the app.

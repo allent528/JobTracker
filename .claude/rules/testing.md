@@ -5,6 +5,7 @@ paths:
   - "tests/**"
   - "playwright.config.ts"
   - "vitest.config.mts"
+  - "vitest.rls.config.mts"
 ---
 
 # Testing: unit, RLS, e2e
@@ -20,6 +21,12 @@ paths:
 - No real people's names, emails, phone numbers or real salary data in tests or screenshots.
 - CI runs unit tests only (no secrets in CI); RLS and e2e run locally against the Docker stack.
 - A bug fix starts with a failing test (see `validate-fix`).
+
+## RLS suite
+- `npm run test:rls` runs `tests/rls/**/*.test.ts` with `vitest.rls.config.mts` (loads `.env.local`, files run serially). The main `vitest.config.mts` only includes `src/**`, so CI never needs a database.
+- It recreates fake users `rls-a@example.com` / `rls-b@example.com` each run and signs them in with admin `generateLink` + `verifyOtp({ type: "email", token_hash })` (no email involved). It reuses the localhost guard and admin client from `tests/e2e/support/local-env.ts`.
+- Every new table or policy gets attacker-side checks there: B can't read/update/delete A's rows, can't insert under A's parent, can't move rows to A. Expect `42501` for RLS/privilege denials and `23514` for check violations; an RLS-filtered update or delete returns `data: []`, not an error.
+- `npx supabase db reset` wipes auth users too; Playwright's global setup recreates its own.
 
 ## Lessons learned
 - E2E setup lives in `tests/e2e/global-setup.ts` (creates confirmed fake users with the admin API) and `tests/e2e/support/local-env.ts` (admin client, Mailpit helpers, a guard that throws unless the Supabase URL is localhost). `playwright.config.ts` loads `.env.local` with `process.loadEnvFile`.

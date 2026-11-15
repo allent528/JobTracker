@@ -38,3 +38,15 @@
 - **Root cause:** The `//` check ran on the raw input, but URL parsing removes dot segments afterwards, which can produce a leading `//`.
 - **Fix:** Check the normalized result: return `/` unless the origin is ours, the normalized path doesn't start with `//`, and it isn't a public path. Unit tests cover these inputs plus a "never starts with //" sweep; the e2e uses `?next=/.//evil.example.com`.
 - **Lesson:** Validate the normalized URL, not the input string.
+
+## 2026-11-14: `default (select auth.uid())` is invalid Postgres
+- **Mistake:** `.claude/rules/database.md` told every table to use `user_id ... default (select auth.uid())`.
+- **Root cause:** Postgres rejects subqueries in column defaults ("cannot use subquery in DEFAULT expression"). The `(select ...)` wrapper is an RLS-policy performance trick, not a default.
+- **Fix:** Columns use `default auth.uid()`; policies keep `(select auth.uid())`. Rule corrected.
+- **Lesson:** Verify snippets copied into rule files against a real database.
+
+## 2026-11-14: `supabase db query` runs one statement per call
+- **Mistake:** A multi-statement string (and `-f` with several statements) failed with "cannot insert multiple commands into a prepared statement".
+- **Root cause:** The CLI sends the SQL as a single prepared statement.
+- **Fix:** Run statements one per call.
+- **Lesson:** Recorded in `.claude/rules/database.md`.

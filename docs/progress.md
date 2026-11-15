@@ -121,3 +121,30 @@
   - Consider custom SMTP; the built-in sender is heavily rate-limited.
 - Deferred to step 4: a reusable `signInAs(page, email)` e2e fixture (admin `generateLink` plus `storageState`), built with the first signed-in flow.
 - Still open from step 1: DB password reset and the read-only MCP decision.
+
+## 2026-11-14: Launch step 3 (Schema)
+**Status:** Done, pending owner review (branch `feat/schema`). Applied to the local stack only; nothing pushed to prod.
+**What was done**
+- Eight migrations, one concern each (all verified with `npx supabase db reset`):
+  - `20261115014501_create_private_helpers`: unexposed `private` schema (no client usage, execute revoked by default) and `private.set_updated_at()`.
+  - `20261115014503_create_profiles`: `profiles` (id = auth user, `time_zone` default `UTC`), RLS select/update own, `authenticated` may only `update (time_zone)`; `private.validate_time_zone()` trigger (`invalid_time_zone`, errcode 22023) against `pg_timezone_names`; security definer `private.handle_new_user()` trigger on `auth.users`; backfills profiles for existing users (the owner on prod).
+  - `20261115014504_create_applications`: all PRD columns; checks for status (= `STATUSES`), work_mode, non-blank company/role, `http(s)` job_url, salary >= 0 and min <= max, ISO currency (default USD); per-operation RLS; updated_at trigger.
+  - `20261115014506_create_status_events`: select-only table (writes revoked from anon, authenticated and service_role); security definer `private.log_status_event()` with `after insert` and `after update of status when (old.status is distinct from new.status)` triggers.
+  - `20261115014508_create_notes`, `20261115014510_create_contacts` (http(s) linkedin_url), `20261115014512_create_interviews` (kind, outcome, 1-1440 minute duration checks): per-operation RLS; insert/update check the parent application is the user's.
+  - `20261115014513_create_interview_contacts`: join rows (unique pair); insert requires the interview and contact to be the user's and on the same application; no update.
+- Every table: `revoke all from anon, authenticated` then explicit grants to `authenticated` only; `user_id` FK + index; child FKs indexed and cascade-delete.
+- `src/lib/closed-sets.ts`: `WORK_MODES`, `INTERVIEW_KINDS`, `INTERVIEW_OUTCOMES`. `src/lib/check-constraints.test.ts` parses the migrations and checks the four closed-set constraints match the TS constants (step 1 follow-up).
+- RLS suite `tests/rls/rls.test.ts` (`npm run test:rls`, separate `vitest.rls.config.mts`): two fake users; cross-user read/update/delete/insert/re-parent on every table; anon denied everywhere; status_events can't be written by clients (own rows included); trigger logs initial status and each change, not no-ops; profile created with UTC, bad time zone rejected; every status accepted, bad values rejected for each check; application delete cascades children and history.
+- Regenerated `src/types/database.types.ts` (ASCII).
+**Files:** `supabase/migrations/*.sql` (8), `src/types/database.types.ts`, `src/lib/{closed-sets,check-constraints.test}.ts`, `tests/rls/rls.test.ts`, `vitest.rls.config.mts`, `package.json`, `.claude/CLAUDE.md`, `.claude/rules/{database,testing}.md`, `docs/learnings.md`
+**Checks:** `npx supabase db reset` clean; typecheck, lint, `npm test` (52/52), build with CI placeholder env, `npm run test:e2e` (4/4), `npm run test:rls` (20/20). Mutation check: weakening the notes insert policy and dropping the no-op guard on the status trigger each made the RLS suite fail. Local advisors (`npx supabase db advisors --type all --level info`): only `unused_index` INFO on the empty DB (expected); `npx supabase db lint --schema public,private`: no errors. Supabase MCP not used (points at prod).
+**Decisions / defaults**
+- Default currency USD (PRD default); follow-ups are `date`, interviews `timestamptz` (PRD default).
+- `interviews.interviewers` (free text) added: F7 allows interviewers as free text, which the data model had no column for. `interviews.scheduled_at` is required.
+- New applications default to `saved`; "applied if date_applied is set" and "date_applied = today when moving to applied" (F2, F4) stay in the step 4 Server Action, since "today" depends on the owner's time zone.
+- `status_events` has no check on from/to status (only the trigger writes it, copying a checked value), so renaming a status touches one constraint.
+- No stats views yet (step 8, D13). No seed rows: tests create their own users and data.
+- Known gap: moving a contact or interview to another application (both the user's) leaves existing interview_contacts links crossing applications. Step 6 UI doesn't move them; revisit if it ever does.
+**Follow-ups**
+- Prod push of these 8 migrations is an owner-approval item for step 9 (`supabase link` + `db push`, after the security review).
+- Step 4: Zod schemas must mirror the DB checks (non-blank company/role, http(s) URLs, salary rules, currency `^[A-Z]{3}$`); map `invalid_time_zone` and 23514 to user-facing copy.
