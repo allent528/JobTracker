@@ -21,4 +21,6 @@ paths:
 - Don't log row contents (contacts, salaries, notes) to the console or error reports.
 
 ## Lessons learned
-- (none yet)
+- Reads of one row go through helpers in `src/lib/application-queries.ts` (server-only): validate the id with Zod, filter by `user_id` as well as RLS, and call `notFound()` for a bad, missing or foreign id.
+- Updates and deletes chain `.select("id").maybeSingle()`: an RLS-filtered write returns no row rather than an error, so `null` means "not found" and the action says so.
+- Map write errors with `writeErrorMessage()` (`src/lib/db-errors.ts`); never return or log the database message, which can quote row values.

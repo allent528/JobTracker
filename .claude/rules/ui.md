@@ -25,4 +25,7 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 - `interviews.location` is free text that may hold a video link. Render it as a link only if it matches `^https?://`; otherwise show plain text. (`job_url` and `linkedin_url` are already limited to http(s) by the database.)
 
 ## Lessons learned
-- (none yet)
+- Form schemas that transform values (strings to numbers or nulls) use `zodResolver(schema, undefined, { raw: true })` with `useForm<z.input<…>>`, and the submit handler sends those raw values to the Server Action, which parses them with the same schema. The generated `FormField` types assume input and output types match.
+- Action errors go to a sonner toast (`<Toaster />` is in the root layout); success messages for in-place changes (status, archive) too.
+- Next keeps recently visited routes mounted but hidden (`<Activity>`), so client state can outlive a navigation. Components whose state mirrors server data reset with a `key` (e.g. `StatusControl key={status}`).
+- Status changes on the detail page apply on an explicit button, not on the select's `change` event: arrowing through a closed native select fires `change` per option on Windows, which would log a status event each time.

@@ -56,3 +56,15 @@
 - **Root cause:** Unique indexes are checked while the row is inserted; FK checks run afterwards (as constraint triggers).
 - **Fix:** That ordering was a small existence oracle (someone knowing both UUIDs could tell whether another user had linked them). The security re-review closed it: the key is now `unique (user_id, interview_id, contact_id)`, so a forged pair never collides and always fails the FK with 23503. Tests cover insert and `upsert(..., { ignoreDuplicates: true })` of an existing pair.
 - **Lesson:** Lead unique keys on user-owned rows with `user_id`. Recorded in `.claude/rules/database.md` and `testing.md`.
+
+## 2026-11-14: Next 16 keeps the previous route mounted, hidden
+- **Mistake:** The applications e2e failed with a strict-mode violation: `getByLabel("Company")` matched two inputs after navigating from `/applications/new` to the edit page.
+- **Root cause:** With Cache Components, the router keeps recently visited pages mounted inside a hidden React `<Activity>` (`display: none`), so their form fields stay in the DOM. `getByRole` skips hidden elements; `getByLabel` and CSS locators don't.
+- **Fix:** The spec's `field()` helper uses `getByLabel(label).filter({ visible: true })`; the status select is found by role. A check that the next "New application" form starts blank guards against stale state leaking from the hidden copy.
+- **Lesson:** In e2e, prefer role locators or add `.filter({ visible: true })`. Recorded in `.claude/rules/testing.md`.
+
+## 2026-11-14: zodResolver with a transforming schema vs the shadcn FormField types
+- **Mistake:** `useForm<Input, unknown, Output>` with `zodResolver(applicationSchema)` failed to typecheck against the generated `FormField` (its `ControllerProps` has no transformed-values parameter).
+- **Root cause:** The application schema turns strings into numbers and nulls, so input and output types differ, and `src/components/ui/form.tsx` (generated, not to be forked) assumes they're equal.
+- **Fix:** `zodResolver(schema, undefined, { raw: true })` validates with the schema but hands back the raw string values. The Server Action parses those with the same schema, so nothing changes at the boundary.
+- **Lesson:** Forms whose schema transforms values use raw mode and send the raw input to the action. Recorded in `.claude/rules/ui.md`.

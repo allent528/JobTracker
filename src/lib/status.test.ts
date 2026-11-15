@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUSES, STATUS_META, nextSuggestedStatus } from "./status";
+import {
+  ACTIVE_STATUSES,
+  CLOSED_STATUSES,
+  isStatus,
+  nextSuggestedStatus,
+  STATUS_META,
+  STATUSES,
+  statusLabel,
+} from "./status";
 
 describe("status", () => {
   it("lists the nine PRD statuses in lifecycle order", () => {
@@ -34,5 +42,14 @@ describe("status", () => {
     expect(nextSuggestedStatus("accepted")).toBeNull();
     expect(nextSuggestedStatus("rejected")).toBeNull();
     expect(nextSuggestedStatus("ghosted")).toBeNull();
+  });
+});
+
+describe("isStatus / statusLabel", () => {
+  it("recognizes stored statuses and labels them", () => {
+    expect(isStatus("applied")).toBe(true);
+    expect(isStatus("hired")).toBe(false);
+    expect(statusLabel("interviewing")).toBe("Interviewing");
+    expect(statusLabel("retired_value")).toBe("retired_value");
   });
 });
