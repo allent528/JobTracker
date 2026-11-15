@@ -1,4 +1,4 @@
-/** User-facing copy for a failed supabase-js write. Never echoes the database message (it can quote row values). */
+/** Never echoes the database message: it can quote row values. */
 export function writeErrorMessage(error: { code?: string } | null | undefined): string {
   switch (error?.code) {
     case "23514": // check_violation
@@ -9,11 +9,7 @@ export function writeErrorMessage(error: { code?: string } | null | undefined): 
     case "23503": // foreign_key_violation
     case "42501": // insufficient_privilege / RLS denial
       return "You can't make that change.";
-    case "22023": // invalid_parameter_value (invalid_time_zone)
-      return "That time zone isn't recognized.";
     default:
       return "We couldn't save your changes. Try again.";
   }
 }
-
-export const NOT_FOUND_MESSAGE = "That application no longer exists.";

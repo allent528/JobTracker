@@ -6,7 +6,6 @@ import {
   nextSuggestedStatus,
   STATUS_META,
   STATUSES,
-  statusLabel,
 } from "./status";
 
 describe("status", () => {
@@ -45,11 +44,9 @@ describe("status", () => {
   });
 });
 
-describe("isStatus / statusLabel", () => {
-  it("recognizes stored statuses and labels them", () => {
+describe("isStatus", () => {
+  it("recognizes statuses", () => {
     expect(isStatus("applied")).toBe(true);
     expect(isStatus("hired")).toBe(false);
-    expect(statusLabel("interviewing")).toBe("Interviewing");
-    expect(statusLabel("retired_value")).toBe("retired_value");
   });
 });

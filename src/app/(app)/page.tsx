@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { listApplications } from "@/lib/application-queries";
 import { applicationPath, NEW_APPLICATION_PATH } from "@/lib/applications";
+import { HOME_PATH } from "@/lib/auth-routes";
 
 export const metadata: Metadata = { title: "Applications · JobTracker" };
 
 const ARCHIVED_PARAM = "archived";
 
-// Minimal list so applications are reachable; the table and board views (step 5) replace it.
 export default function Home({ searchParams }: PageProps<"/">) {
   return (
     <section className="grid gap-6">
@@ -22,7 +22,7 @@ export default function Home({ searchParams }: PageProps<"/">) {
           <Link href={NEW_APPLICATION_PATH}>New application</Link>
         </Button>
       </div>
-      <Suspense fallback={<p className="text-muted-foreground">Loading applications…</p>}>
+      <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
         <ApplicationList searchParams={searchParams} />
       </Suspense>
     </section>
@@ -41,7 +41,7 @@ async function ApplicationList({ searchParams }: Pick<PageProps<"/">, "searchPar
           {includeArchived ? ", including archived" : ""}
         </p>
         <Link
-          href={includeArchived ? "/" : `/?${ARCHIVED_PARAM}=1`}
+          href={includeArchived ? HOME_PATH : `${HOME_PATH}?${ARCHIVED_PARAM}=1`}
           className="font-medium underline underline-offset-4"
         >
           {includeArchived ? "Hide archived" : "Show archived"}
@@ -57,7 +57,7 @@ async function ApplicationList({ searchParams }: Pick<PageProps<"/">, "searchPar
             <li key={app.id}>
               <Link
                 href={applicationPath(app.id)}
-                className="flex flex-wrap items-center justify-between gap-2 p-4 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+                className="flex flex-wrap items-center justify-between gap-2 p-4 hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:ring-inset focus-visible:outline-none"
               >
                 <span className="min-w-0">
                   <span className="block font-medium break-words">{app.company}</span>

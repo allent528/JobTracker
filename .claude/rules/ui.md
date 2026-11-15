@@ -11,7 +11,7 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 ## Conventions
 - Components come from shadcn/ui (`npx shadcn@latest add <component>`, or the shadcn MCP). `src/components/ui/` is generated, so restyle via Tailwind theme tokens, not by forking components.
 - Server Components by default; add `'use client'` only for interactivity (forms, board drag, charts).
-- Forms: react-hook-form + `zodResolver` with the same schema the Server Action uses; show field errors inline and the action's `error` in a toast. Exception: the sign-in form shows action errors inline in a `role="alert"` paragraph (one small card, no toast library needed yet).
+- Forms: react-hook-form + `zodResolver` with the same schema the Server Action uses; show field errors inline and the action's `error` in a toast. Exception: the sign-in form shows action errors inline in a `role="alert"` paragraph, because the code step needs the message beside the code field.
 - Board (F3): `@dnd-kit/core`, one droppable per active status, `useOptimistic` for the move with rollback on error (D12). Card order is automatic (D9); no reorder within a column.
 - Status labels, colors and order come from `src/lib/status.ts`. Never hard-code a status string in JSX.
 - Dates are formatted with `src/lib/dates.ts` helpers in the owner's time zone.
@@ -26,6 +26,6 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 
 ## Lessons learned
 - Form schemas that transform values (strings to numbers or nulls) use `zodResolver(schema, undefined, { raw: true })` with `useForm<z.input<…>>`, and the submit handler sends those raw values to the Server Action, which parses them with the same schema. The generated `FormField` types assume input and output types match.
-- Action errors go to a sonner toast (`<Toaster />` is in the root layout); success messages for in-place changes (status, archive) too.
-- Next keeps recently visited routes mounted but hidden (`<Activity>`), so client state can outlive a navigation. Components whose state mirrors server data reset with a `key` (e.g. `StatusControl key={status}`).
+- Show action results with `toastResult(result, success?)` from `src/lib/toast-result.ts` (sonner; `<Toaster />` is in the root layout). Status changes go through `useChangeStatus()` in `src/app/(app)/applications/`, so the board reuses the same call and toast.
+- Next keeps recently visited routes mounted but hidden, so client state can outlive a navigation (see docs/learnings.md). Client state seeded from server data remounts on a `key` that changes with that data: the edit form keys on `updated_at`, and `StatusControl` keys its inner select on `status`.
 - Status changes on the detail page apply on an explicit button, not on the select's `change` event: arrowing through a closed native select fires `change` per option on Windows, which would log a status event each time.

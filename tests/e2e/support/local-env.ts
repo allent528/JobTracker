@@ -8,6 +8,8 @@ export const TEST_USERS = {
   link: "e2e-link@example.com",
   applications: "e2e-applications@example.com",
   appliedOnCreate: "e2e-applied-on-create@example.com",
+  isolationOwner: "e2e-isolation-owner@example.com",
+  isolationOther: "e2e-isolation-other@example.com",
 } as const;
 
 /** Must never have an account; global setup deletes it if a past run left one. */

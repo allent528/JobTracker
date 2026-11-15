@@ -41,7 +41,3 @@ export function isStatus(value: string): value is Status {
   return (STATUSES as readonly string[]).includes(value);
 }
 
-/** Label for a stored status value; falls back to the raw value if it's no longer in STATUSES. */
-export function statusLabel(value: string): string {
-  return isStatus(value) ? STATUS_META[value].label : value;
-}

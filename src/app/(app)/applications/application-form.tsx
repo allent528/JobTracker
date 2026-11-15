@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useTransition } from "react";
 import { type Control, useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,24 +20,23 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { WORK_MODE_LABELS, WORK_MODES } from "@/lib/closed-sets";
 import { TEXT_LIMITS } from "@/lib/limits";
-import {
-  type ApplicationFormValues,
-  applicationSchema,
-} from "@/lib/schemas/application";
-
-import { createApplication, updateApplication } from "./actions";
+import type { ActionResult } from "@/lib/action-result";
+import { type ApplicationFormValues, applicationSchema } from "@/lib/schemas/application";
+import { toastResult } from "@/lib/toast-result";
 
 type TextFieldName = Exclude<keyof ApplicationFormValues, "work_mode">;
 
 const LIMITS = TEXT_LIMITS.applications;
 
-/** Create (no `applicationId`) or edit form for an application (F2). */
 export function ApplicationForm({
-  applicationId,
+  action,
+  submitLabel,
   defaultValues,
   cancelHref,
 }: {
-  applicationId?: string;
+  /** Redirects on success, so it only returns errors. */
+  action: (input: ApplicationFormValues) => Promise<ActionResult<never>>;
+  submitLabel: string;
   defaultValues: ApplicationFormValues;
   cancelHref: string;
 }) {
@@ -51,10 +49,7 @@ export function ApplicationForm({
   // Raw mode keeps the string inputs; the action parses them with the same schema (D14).
   const onSubmit = form.handleSubmit((values) => {
     startTransition(async () => {
-      const result = applicationId
-        ? await updateApplication(applicationId, values)
-        : await createApplication(values);
-      if (!result.ok) toast.error(result.error);
+      toastResult(await action(values));
     });
   });
 
@@ -163,7 +158,7 @@ export function ApplicationForm({
             <Link href={cancelHref}>Cancel</Link>
           </Button>
           <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : applicationId ? "Save changes" : "Create application"}
+            {pending ? "Saving…" : submitLabel}
           </Button>
         </div>
       </form>

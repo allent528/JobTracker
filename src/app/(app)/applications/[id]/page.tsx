@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { getApplicationOrNotFound, getStatusHistory } from "@/lib/application-queries";
 import { editApplicationPath, formatSalaryRange } from "@/lib/applications";
 import { HOME_PATH } from "@/lib/auth-routes";
-import { WORK_MODE_LABELS, type WorkMode } from "@/lib/closed-sets";
+import { WORK_MODE_LABELS } from "@/lib/closed-sets";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { getTimeZone } from "@/lib/profile";
-import { isStatus, statusLabel } from "@/lib/status";
+import { STATUS_META } from "@/lib/status";
 
 import { ArchiveButton, DeleteButton, StatusControl } from "./application-controls";
 
@@ -23,7 +23,7 @@ export default function ApplicationPage({ params }: PageProps<"/applications/[id
       <Link href={HOME_PATH} className="text-sm font-medium underline underline-offset-4 justify-self-start">
         All applications
       </Link>
-      <Suspense fallback={<p className="text-muted-foreground">Loading application…</p>}>
+      <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
         <ApplicationDetail params={params} />
       </Suspense>
     </div>
@@ -43,7 +43,7 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
       </a>
     )],
     ["Location", app.location],
-    ["Work mode", app.work_mode && (WORK_MODE_LABELS[app.work_mode as WorkMode] ?? app.work_mode)],
+    ["Work mode", app.work_mode && WORK_MODE_LABELS[app.work_mode]],
     ["Salary", formatSalaryRange(app.salary_min, app.salary_max, app.salary_currency)],
     ["Source", app.source],
     ["Date applied", app.date_applied && formatDate(app.date_applied)],
@@ -70,14 +70,12 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
         </div>
       </header>
 
-      {isStatus(app.status) && (
-        <section aria-labelledby="status-heading" className="grid gap-3 rounded-lg border p-4">
-          <h2 id="status-heading" className="text-lg font-semibold">
-            Status
-          </h2>
-          <StatusControl key={app.status} id={app.id} status={app.status} />
-        </section>
-      )}
+      <section aria-labelledby="status-heading" className="grid gap-3 rounded-lg border p-4">
+        <h2 id="status-heading" className="text-lg font-semibold">
+          Status
+        </h2>
+        <StatusControl id={app.id} status={app.status} />
+      </section>
 
       <section aria-labelledby="details-heading" className="grid gap-3">
         <h2 id="details-heading" className="text-lg font-semibold">
@@ -111,8 +109,8 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
             <li key={event.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-b pb-2 last:border-b-0">
               <span>
                 {event.from_status === null
-                  ? `Created as ${statusLabel(event.to_status)}`
-                  : `${statusLabel(event.from_status)} → ${statusLabel(event.to_status)}`}
+                  ? `Created as ${STATUS_META[event.to_status].label}`
+                  : `${STATUS_META[event.from_status].label} → ${STATUS_META[event.to_status].label}`}
               </span>
               <time dateTime={event.changed_at} className="text-sm text-muted-foreground">
                 {formatDateTime(event.changed_at, timeZone)}

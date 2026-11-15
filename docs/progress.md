@@ -166,26 +166,49 @@
 - Step 8: stats views return raw facts ordered by `changed_at`; classify statuses (active/closed, "screening or later") in TS from `status.ts`, not hard-coded status lists in SQL.
 
 ## 2026-11-14: Launch step 4 (Applications CRUD F2 + status changes F4)
-**Status:** Done, pending owner review (branch `feat/applications-crud`). No migration; nothing touched prod.
+**Status:** Done, pending owner review (PR 4, branch `feat/applications-crud`). No migration; nothing touched prod.
 **What was done**
-- Routes: `/` lists applications (company, role, status, Archived badge; archived hidden unless `?archived=1` via "Show archived"; step 5 replaces it), `/applications/new`, `/applications/[id]` (detail), `/applications/[id]/edit`. Data reads sit inside `<Suspense>` (Cache Components) and go through `src/lib/application-queries.ts` (server-only; uuid check, `user_id` filter on top of RLS, `notFound()` for bad/missing/foreign ids).
-- Server Actions in `src/app/(app)/applications/actions.ts`: `createApplication` (status `applied` when a date applied is set, else `saved`; redirects to the detail page), `updateApplication` (content columns only), `changeStatus`, `setArchived`, `deleteApplication` (redirects home; children and history cascade). Each re-checks the user, parses with the shared Zod schema, filters by `user_id`, treats "no row returned" as not found, maps DB errors with `writeErrorMessage()` and revalidates `/` and the detail path. No `status_events` writes; only granted content columns are written.
-- `src/lib/schemas/application.ts` mirrors the DB checks: non-blank company/role, `TEXT_LIMITS`, http(s) `job_url` (also `URL.canParse`), whole non-negative salaries up to int4 max (commas allowed), min <= max, `^[A-Z]{3}$` currency (upper-cased), `WORK_MODES`, real `YYYY-MM-DD` dates; blanks become null. `statusChangeSchema` uses `z.enum(STATUSES)`.
-- Detail page: status badge, all fields (salary via `formatSalaryRange`, dates via `src/lib/dates.ts`, job link with `rel="noopener noreferrer"`), description, status control (select + "Change status", plus "Move to <next>" from `nextSuggestedStatus`), Archive/Unarchive, Delete behind an AlertDialog, and the status history (newest first, times in `profiles.time_zone` via `getTimeZone()`, UTC fallback).
-- Helpers: `src/lib/applications.ts` (`initialStatus`, `toFormValues`, `EMPTY_APPLICATION_FORM`, `formatSalaryRange`, paths), `src/lib/dates.ts` (`formatDate`, `formatDateTime`, `FALLBACK_TIME_ZONE`), `src/lib/db-errors.ts`, `src/lib/profile.ts`, `isStatus`/`statusLabel` in `status.ts`, `WORK_MODE_LABELS` in `closed-sets.ts`, `src/components/status-badge.tsx`.
-- shadcn: textarea, native-select, alert-dialog, badge, sonner (adds `sonner` and `next-themes`; checked repos/maintainers). `<Toaster />` in the root layout.
-- Tests: unit tests for the schema (every mirrored check), helpers, dates, status guards. E2E `tests/e2e/applications.spec.ts` with the new reusable `signInAs` fixture (`tests/e2e/support/fixtures.ts`: admin `generateLink` + `/auth/confirm`, wipes that user's applications first): at 375px create (validation errors first), edit, Move to Applied (history + date applied = today), any-status change, archive/hidden/show archived/unarchive, delete with cancel then confirm, 404 after delete; plus "a date applied on create starts in Applied" and a blank next "New application" form. `auth.spec.ts` now expects the "Applications" heading.
-- Rules: ui.md, testing.md, server-actions.md lessons; learnings for hidden Activity routes in e2e and zodResolver raw mode.
-**Files:** `src/app/(app)/page.tsx`, `src/app/(app)/applications/{actions.ts,application-form.tsx}`, `src/app/(app)/applications/new/page.tsx`, `src/app/(app)/applications/[id]/{page.tsx,application-controls.tsx}`, `src/app/(app)/applications/[id]/edit/page.tsx`, `src/app/layout.tsx`, `src/components/status-badge.tsx`, `src/components/ui/{alert-dialog,badge,native-select,sonner,textarea}.tsx`, `src/lib/{applications,application-queries,dates,db-errors,profile}.ts`, `src/lib/{applications,dates}.test.ts`, `src/lib/schemas/application{,.test}.ts`, `src/lib/{status,status.test,closed-sets}.ts`, `tests/e2e/{applications.spec,auth.spec}.ts`, `tests/e2e/support/{fixtures,local-env}.ts`, `package.json`, `package-lock.json`, `.claude/rules/{ui,testing,server-actions}.md`, `docs/learnings.md`
-**Checks:** typecheck, lint, `npm test` (75/75), `npm run build` with the CI placeholder env, `npm run test:e2e` (6/6), `npm run test:rls` (29/29) all pass locally.
+- Routes:
+  - `/` lists applications (company, role, status, Archived badge). Archived ones are hidden unless "Show archived" (`?archived=1`). Step 5 replaces this list.
+  - `/applications/new`, `/applications/[id]` (detail), `/applications/[id]/edit`.
+  - Data reads sit inside `<Suspense>` (Cache Components) and go through `src/lib/application-queries.ts` (server-only). Every query filters by `user_id` on top of RLS. `getApplicationOrNotFound` validates the id and calls `notFound()` for a bad, missing or foreign id. Stored `status` / `work_mode` are narrowed to `Status` / `WorkMode` once there (safe by the check constraints and check-constraints.test.ts).
+- Server Actions (`src/app/(app)/applications/actions.ts`). Each re-checks the user and parses with the shared Zod schema (`parseOr`). None writes `status_events`, and they write only granted content columns.
+  - `createApplication`: inserts with status `applied` when a date applied is set, else `saved`; revalidates `/` and redirects to the detail page.
+  - `updateApplication` (bound to the id by the edit page), `changeStatus`, `setArchived({ id, archived })`: go through `updateOwnApplication`, which filters by `user_id`, maps "no row returned" to `APPLICATION_NOT_FOUND` and DB errors to `writeErrorMessage()`. They revalidate `/` and the detail path.
+  - `deleteApplication`: goes through `deleteOwnApplication` (same mapping); children and history cascade; revalidates `/` and redirects there.
+- Validation (`src/lib/schemas/application.ts`) mirrors the DB checks: non-blank company/role, `TEXT_LIMITS`, http(s) `job_url` (also `URL.canParse`), whole non-negative salaries up to the int4 max (commas allowed), min <= max, a 3-letter uppercase currency code (input upper-cased), `WORK_MODES`, real `YYYY-MM-DD` dates. Blanks become null. `statusChangeSchema` uses `z.enum(STATUSES)`; `archiveSchema` takes a uuid and a boolean.
+- Detail page:
+  - Status badge and all fields: salary via `formatSalaryRange`, dates via `src/lib/dates.ts`, job link with `rel="noopener noreferrer"`. Description.
+  - Status control: select plus "Change status", and "Move to <next>" from `nextSuggestedStatus`. Both go through `useChangeStatus()` (reusable by the step 5 board).
+  - Archive/Unarchive, and Delete behind an AlertDialog.
+  - Status history, newest first, in `profiles.time_zone` via `getTimeZone()` (UTC fallback).
+- The edit form remounts on `updated_at` (`key`), so the hidden, still-mounted edit route never shows values from before a change made elsewhere (see learnings).
+- Client results show through `toastResult()` (`src/lib/toast-result.ts`, sonner).
+- Other helpers: `src/lib/applications.ts` (`Application` type, `APPLICATION_NOT_FOUND`, `initialStatus`, `toFormValues`, `EMPTY_APPLICATION_FORM`, `formatSalaryRange`, paths), `src/lib/dates.ts`, `src/lib/db-errors.ts`, `src/lib/profile.ts`, `isStatus` in `status.ts`, `WORK_MODE_LABELS` in `closed-sets.ts`, `src/components/status-badge.tsx`.
+- shadcn: textarea, native-select, alert-dialog, badge, sonner (adds `sonner` and `next-themes`; repos and maintainers checked). `<Toaster />` is in the root layout.
+- Rules updated: ui.md, testing.md, server-actions.md, database.md (renaming a status must migrate `status_events` rows). Learnings: hidden routes in e2e, stale form state, zodResolver raw mode, escape sequences decoded by Edit and heredocs.
+**Tests**
+- Unit: schema (every mirrored check, `statusChangeSchema`, `archiveSchema`), application helpers, dates, `isStatus`.
+- E2E fixture `signInAs(email, page?)` (`tests/e2e/support/fixtures.ts`): admin `generateLink` and `/auth/confirm`, after deleting that user's applications.
+- E2E `tests/e2e/applications.spec.ts`:
+  - At 375px: create (validation errors first), edit, Edit then Cancel, "Move to Applied" (history and date applied = today), Edit again shows that date and saving keeps it, any-status change, archive / hidden / show archived / unarchive, delete with cancel then confirm, 404 after delete, no horizontal scroll.
+  - A date applied on create starts in Applied; the next "New application" form is blank.
+  - A second signed-in user opening another user's `/applications/<id>` and `/edit` gets the not-found page and none of the data.
+- `auth.spec.ts` now expects the "Applications" heading.
+**Checks**
+- typecheck, lint, build with the CI placeholder env: pass.
+- `npm test`: 76/76. `npm run test:e2e`: 7/7 (4 auth, 3 applications). `npm run test:rls`: 29/29.
+- Removing the edit form's `key` makes the e2e fail (checked).
+- Verification agent: PASS. Security reviewer: SAFE (live IDOR, CSRF and mass-assignment probes all blocked). Code-quality review: five passes, findings applied in a second commit.
 **Decisions / defaults**
 - Default currency USD (PRD default), editable per application; follow-ups are date-only (PRD default).
-- Status is not on the create/edit form: F2 sets the initial status, F4 changes it on the detail page. Editing date applied later doesn't change status.
-- The status select applies on an explicit "Change status" button (keyboard arrowing through a native select fires `change` per option). "Move to <next>" follows `nextSuggestedStatus`; `accepted` and the other closed statuses show no suggestion.
-- Archive needs no confirmation; delete does (ui.md). Archived applications are still reachable by URL and from "Show archived".
+- Status isn't on the create/edit form: F2 sets the initial status, F4 changes it on the detail page. Editing date applied later doesn't change status.
+- The status select applies on an explicit "Change status" button (keyboard arrowing through a native select fires `change` per option). `accepted` and the other closed statuses show no "Move to" suggestion.
+- Archive needs no confirmation; delete does (ui.md). Archived applications stay reachable by URL and from "Show archived".
 - Salary input accepts commas ("120,000") and stores an integer.
 - Action errors show as toasts (ui.md); field errors inline.
 **Follow-ups**
-- Step 5 replaces the home list with the table and board views (reuse `listApplications`, `StatusBadge`, `changeStatus`).
-- Step 7: detect `profiles.time_zone`; until then dates on the detail page use UTC.
-- Run the verification and security-reviewer agents (personal-data change) before merge.
+- Step 5: replace the home list with table and board (reuse `listApplications`, `StatusBadge`, `useChangeStatus`). Decide where "days in current status" comes from (a view/RPC or a second query) before building the board.
+- Step 6: lift `updateOwnApplication` / `deleteOwnApplication` to a table-generic helper for notes, contacts and interviews. Keep the detail page's fetches in one `Promise.all` and split its sections into small server components.
+- Step 7: detect `profiles.time_zone`; until then the detail page shows times in UTC. Re-add the `22023` (invalid time zone) case to `writeErrorMessage` with the settings form.
+- Cosmetic: `notFound()` inside Suspense streams the not-found UI with HTTP 200.

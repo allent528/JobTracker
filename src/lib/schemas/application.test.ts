@@ -9,6 +9,7 @@ import {
   applicationSchema,
   SALARY_MAX_VALUE,
   statusChangeSchema,
+  archiveSchema,
 } from "./application";
 
 const LIMITS = TEXT_LIMITS.applications;
@@ -149,5 +150,13 @@ describe("statusChangeSchema", () => {
   it("rejects unknown statuses and bad ids", () => {
     expect(statusChangeSchema.safeParse({ id: ID, status: "hired" }).success).toBe(false);
     expect(statusChangeSchema.safeParse({ id: "not-a-uuid", status: "saved" }).success).toBe(false);
+  });
+});
+
+describe("archiveSchema", () => {
+  it("needs a uuid and a boolean", () => {
+    expect(archiveSchema.safeParse({ id: ID, archived: true }).success).toBe(true);
+    expect(archiveSchema.safeParse({ id: ID, archived: "true" }).success).toBe(false);
+    expect(archiveSchema.safeParse({ id: "x", archived: false }).success).toBe(false);
   });
 });

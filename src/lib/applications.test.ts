@@ -71,8 +71,9 @@ describe("formatSalaryRange", () => {
     expect(formatSalaryRange(null, null, "USD")).toBeNull();
   });
 
-  it("falls back to the plain code when Intl doesn't know the currency", () => {
-    expect(formatSalaryRange(0, null, "ZZZ")).toMatch(/0/);
+  it("shows a well-formed but unknown currency code as-is", () => {
+    // Intl separates the code from the amount with a no-break space.
+    expect(formatSalaryRange(150000, null, "ZZZ")).toBe("From ZZZ\u00a0150,000");
   });
 });
 

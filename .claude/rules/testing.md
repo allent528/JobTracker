@@ -33,6 +33,6 @@ paths:
 - E2E setup lives in `tests/e2e/global-setup.ts` (creates confirmed fake users with the admin API) and `tests/e2e/support/local-env.ts` (admin client, Mailpit helpers, a guard that throws unless the Supabase URL is localhost). `playwright.config.ts` loads `.env.local` with `process.loadEnvFile`.
 - Give each spec its own test user/inbox: tests run in parallel and Mailpit searches by recipient.
 - `getByRole("alert")` also matches Next's empty `#__next-route-announcer__`; filter by text (`.filter({ hasText })`).
-- Signed-in specs use the `signInAs(email)` fixture from `tests/e2e/support/fixtures.ts` (import `test`/`expect` from there): it deletes the user's applications, makes a magic-link token hash with the admin API and opens `/auth/confirm` with it. No email involved. Add a user per spec to `TEST_USERS`.
-- Next keeps the previous route mounted but hidden, so `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`.
+- Signed-in specs use the `signInAs(email, page?)` fixture from `tests/e2e/support/fixtures.ts` (import `test`/`expect` from there): it deletes the user's applications, makes a magic-link token hash with the admin API and opens `/auth/confirm` with it. No email involved. Pass a page from `browser.newContext()` to sign in a second user. Add a user per test to `TEST_USERS`.
+- Hidden, still-mounted routes (docs/learnings.md) mean `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`.
 - The magic link is built from `site_url` in `supabase/config.toml`, so it must match Playwright's `baseURL` (`http://localhost:3000`); cookies are per host.

@@ -4,13 +4,11 @@ import { WORK_MODES } from "@/lib/closed-sets";
 import { TEXT_LIMITS } from "@/lib/limits";
 import { STATUSES } from "@/lib/status";
 
-// Mirrors the `applications` check constraints in supabase/migrations; the database is the backstop.
 const LIMITS = TEXT_LIMITS.applications;
 
 /** Largest value a Postgres `integer` column holds. */
 export const SALARY_MAX_VALUE = 2_147_483_647;
 
-/** PRD open question "Default currency?": USD, editable per application (also the column default). */
 export const DEFAULT_CURRENCY = "USD";
 
 const HTTP_URL = /^https?:\/\//i;
@@ -28,7 +26,7 @@ function requiredText(label: string, max: number) {
     .max(max, { error: tooLong(max) });
 }
 
-/** Optional text input: blank becomes null. */
+/** Blank becomes null. */
 function optionalText(max: number) {
   return z
     .string()
@@ -78,7 +76,7 @@ const optionalDate = z
   })
   .transform((value) => value || null);
 
-/** Create and edit form (F2, F8 follow-up fields). Inputs are strings; the output matches the columns. */
+/** Inputs are strings; the output matches the columns. */
 export const applicationSchema = z
   .object({
     company: requiredText("company", LIMITS.company),
@@ -102,14 +100,19 @@ export const applicationSchema = z
   );
 
 export type ApplicationFormValues = z.input<typeof applicationSchema>;
-export type ApplicationValues = z.output<typeof applicationSchema>;
 
 export const applicationIdSchema = z.uuid({ error: "That application doesn't exist." });
 
-/** F4: any status may change to any other (D6). */
 export const statusChangeSchema = z.object({
   id: applicationIdSchema,
   status: z.enum(STATUSES, { error: "Choose a status." }),
 });
 
 export type StatusChangeInput = z.input<typeof statusChangeSchema>;
+
+export const archiveSchema = z.object({
+  id: applicationIdSchema,
+  archived: z.boolean(),
+});
+
+export type ArchiveInput = z.input<typeof archiveSchema>;

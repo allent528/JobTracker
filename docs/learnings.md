@@ -66,5 +66,17 @@
 ## 2026-11-14: zodResolver with a transforming schema vs the shadcn FormField types
 - **Mistake:** `useForm<Input, unknown, Output>` with `zodResolver(applicationSchema)` failed to typecheck against the generated `FormField` (its `ControllerProps` has no transformed-values parameter).
 - **Root cause:** The application schema turns strings into numbers and nulls, so input and output types differ, and `src/components/ui/form.tsx` (generated, not to be forked) assumes they're equal.
-- **Fix:** `zodResolver(schema, undefined, { raw: true })` validates with the schema but hands back the raw string values. The Server Action parses those with the same schema, so nothing changes at the boundary.
+- **Fix:** `zodResolver(schema, undefined, { raw: true })` validates with the schema but hands back the raw string values. The Server Action parses those raw values with the same schema, so the stored values are identical.
 - **Lesson:** Forms whose schema transforms values use raw mode and send the raw input to the action. Recorded in `.claude/rules/ui.md`.
+
+## 2026-11-14: Hidden, still-mounted routes also keep stale form state
+- **Mistake:** The edit form seeds react-hook-form from `defaultValues` once. After Edit, Cancel and a status change (whose trigger sets date applied), opening Edit again showed the old blank date, and saving would have cleared it.
+- **Root cause:** The hidden edit route stayed mounted (see the Activity entry above), so the form never remounted with fresh server values.
+- **Fix:** `<ApplicationForm key={application.updated_at} …/>` remounts it whenever the row changes. The e2e covers Edit, Cancel, Move to Applied, Edit (it fails without the key).
+- **Lesson:** Client state seeded from server data needs a `key` that changes with that data. Recorded in `.claude/rules/ui.md`.
+
+## 2026-11-14: Edit and heredocs decode `\u` escapes in new text
+- **Mistake:** A test written with Edit as `"From ZZZ\u00a0150,000"` was saved with a literal no-break space, an invisible character in the source.
+- **Root cause:** The tool layer turned the escape into the character. Writing this entry with a Bash heredoc did the same.
+- **Fix:** Rewrote the escape with a Node one-liner that builds the backslash with `String.fromCharCode(92)`, then checked the bytes with `od -c`.
+- **Lesson:** After writing an escape sequence, grep the file to check it's still an escape.

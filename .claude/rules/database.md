@@ -44,6 +44,7 @@ Any change here follows the `db-migration` skill.
 - `applications.date_applied` is set to today in the owner's time zone by a `before insert or update of status` trigger when the status becomes `applied` with no date (F4). Clients may still set it explicitly.
 - `status_events.changed_at` defaults to `clock_timestamp()` so events in one transaction order strictly; order history and stats by `changed_at`.
 - `status_events` is written **only** by the `after insert or update of status` trigger on `applications` (D5): a `security definer` function with `set search_path = ''`. Clients get a select policy only; no insert, update or delete policy for anyone. Guard with `when (old.status is distinct from new.status)` on update.
+- `status_events.from_status` / `to_status` have no check constraint, but the app reads them as `Status`. Renaming or removing a status must update existing `status_events` rows in the same migration as the `applications` check constraint (and `src/lib/status.ts`).
 - Transitions are not enforced (D6): no transition checks in SQL.
 - `profiles` row is created by a trigger on `auth.users` insert. `time_zone` is null until detected from the browser (step 7); server code falls back to UTC. Non-null values are validated by a `before insert or update of time_zone` trigger against `pg_timezone_names` (a check constraint can't query a table), plus Zod in the app.
 - Stats (F9) live in SQL views or functions (D13). Views use `security_invoker = true` so RLS applies.

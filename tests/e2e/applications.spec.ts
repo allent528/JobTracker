@@ -5,10 +5,9 @@ import { expect, test } from "./support/fixtures";
 import { TEST_USERS } from "./support/local-env";
 
 // The e2e users have no profiles.time_zone, so "today" is today in UTC (FALLBACK_TIME_ZONE).
-const todayUtc = () => formatDate(new Date().toISOString().slice(0, 10));
+const todayIsoUtc = () => new Date().toISOString().slice(0, 10);
 
-// Next keeps the previous route mounted but hidden (Activity), so a form field can exist twice;
-// only the visible one is on the current page.
+// Hidden, still-mounted routes can repeat a field (docs/learnings.md); use the visible one.
 function field(page: Page, label: string) {
   return page.getByLabel(label).filter({ visible: true });
 }
@@ -40,7 +39,6 @@ test.describe("at phone width", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     await expect(page.getByText("No active applications.")).toBeVisible();
 
-    // Create, with validation errors first.
     await page.getByRole("link", { name: "New application" }).click();
     await expect(page).toHaveURL("/applications/new");
     await page.getByRole("button", { name: "Create application" }).click();
@@ -76,7 +74,6 @@ test.describe("at phone width", () => {
     await expect(history(page).first()).toContainText("Created as Saved");
     await expectNoHorizontalScroll(page);
 
-    // Edit.
     await page.getByRole("link", { name: "Edit" }).click();
     await expect(field(page, "Company")).toHaveValue("Acme Corp");
     await expect(field(page, "Maximum")).toHaveValue("180000");
@@ -87,21 +84,28 @@ test.describe("at phone width", () => {
     await expect(page.getByText("Senior Software Engineer")).toBeVisible();
     await expect(detail(page, "Location")).toHaveText("Springfield");
 
-    // F4: the suggested next step sets date applied (database trigger) and logs history.
+    await page.getByRole("link", { name: "Edit" }).click();
+    await page.getByRole("link", { name: "Cancel" }).click();
+    await expect(page).toHaveURL(detailUrl);
     await page.getByRole("button", { name: "Move to Applied" }).click();
     await expect(history(page)).toHaveCount(2);
     await expect(history(page).first()).toContainText("Saved → Applied");
-    await expect(detail(page, "Date applied")).toHaveText(todayUtc());
+    await expect(detail(page, "Date applied")).toHaveText(formatDate(todayIsoUtc()));
     await expect(statusSelect(page)).toHaveValue("applied");
 
-    // Any status to any other (D6).
+    // The edit form opened before the status change must show the date the trigger set.
+    await page.getByRole("link", { name: "Edit" }).click();
+    await expect(field(page, "Date applied")).toHaveValue(todayIsoUtc());
+    await page.getByRole("button", { name: "Save changes" }).click();
+    await expect(page).toHaveURL(detailUrl);
+    await expect(detail(page, "Date applied")).toHaveText(formatDate(todayIsoUtc()));
+
     await statusSelect(page).selectOption("interviewing");
     await page.getByRole("button", { name: "Change status" }).click();
     await expect(history(page)).toHaveCount(3);
     await expect(history(page).first()).toContainText("Applied → Interviewing");
     await expect(page.getByRole("button", { name: "Move to Offer" })).toBeVisible();
 
-    // Archive hides it from the list until "Show archived".
     await page.getByRole("button", { name: "Archive", exact: true }).click();
     await expect(page.getByRole("button", { name: "Unarchive" })).toBeVisible();
     await page.getByRole("link", { name: "All applications" }).click();
@@ -112,7 +116,6 @@ test.describe("at phone width", () => {
     await page.getByRole("button", { name: "Unarchive" }).click();
     await expect(page.getByRole("button", { name: "Archive", exact: true })).toBeVisible();
 
-    // Delete asks first; Cancel keeps it.
     await page.getByRole("button", { name: "Delete" }).click();
     const dialog = page.getByRole("alertdialog", { name: "Delete this application?" });
     await expect(dialog).toContainText("Senior Software Engineer at Acme Corp");
@@ -144,9 +147,34 @@ test("a new application with a date applied starts in Applied", async ({ page, s
   await expect(history(page).first()).toContainText("Created as Applied");
   await expect(statusSelect(page)).toHaveValue("applied");
 
-  // The next new application starts from a blank form, not the last one's values.
   await page.getByRole("link", { name: "All applications" }).click();
   await page.getByRole("link", { name: "New application" }).click();
   await expect(field(page, "Company")).toHaveValue("");
   await expect(field(page, "Date applied")).toHaveValue("");
+});
+
+test("another user can't open someone else's application", async ({ browser, page, signInAs }) => {
+  await signInAs(TEST_USERS.isolationOwner);
+  await page.goto("/applications/new");
+  await field(page, "Company").fill("Initech");
+  await field(page, "Role title").fill("Platform Engineer");
+  await field(page, "Follow-up note").fill("Owner-only note");
+  await page.getByRole("button", { name: "Create application" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Initech" })).toBeVisible();
+  const detailPath = new URL(page.url()).pathname;
+
+  const otherContext = await browser.newContext();
+  try {
+    const other = await otherContext.newPage();
+    await signInAs(TEST_USERS.isolationOther, other);
+    for (const path of [detailPath, `${detailPath}/edit`]) {
+      await other.goto(path);
+      await expect(other.getByText("This page could not be found.")).toBeVisible();
+      for (const text of ["Initech", "Platform Engineer", "Owner-only note"]) {
+        await expect(other.getByText(text)).toHaveCount(0);
+      }
+    }
+  } finally {
+    await otherContext.close();
+  }
 });

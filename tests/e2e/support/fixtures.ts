@@ -1,19 +1,19 @@
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
 import { adminClient, findUserByEmail } from "./local-env";
 
 type Fixtures = {
   /**
-   * Signs `page` in as an existing test user without email: the local admin API makes a magic-link
-   * token hash and the page opens `/auth/confirm` with it, exactly as the emailed link would.
-   * Deletes the user's applications first (children and history cascade), so each test starts empty.
+   * Signs `target` (default: the test's page) in as an existing test user through `/auth/confirm`
+   * with an admin-generated token hash; no email involved. Deletes the user's applications first,
+   * so each test starts empty.
    */
-  signInAs: (email: string) => Promise<void>;
+  signInAs: (email: string, target?: Page) => Promise<void>;
 };
 
 export const test = base.extend<Fixtures>({
   signInAs: async ({ page }, provide) => {
-    await provide(async (email) => {
+    await provide(async (email, target = page) => {
       const admin = adminClient();
       const user = await findUserByEmail(email);
       if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
@@ -24,8 +24,8 @@ export const test = base.extend<Fixtures>({
       const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
       if (error) throw error;
       const params = new URLSearchParams({ token_hash: data.properties.hashed_token, type: "email" });
-      await page.goto(`/auth/confirm?${params}`);
-      await expect(page).toHaveURL("/");
+      await target.goto(`/auth/confirm?${params}`);
+      await expect(target).toHaveURL("/");
     });
   },
 });

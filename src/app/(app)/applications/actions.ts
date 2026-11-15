@@ -1,34 +1,82 @@
 "use server";
 
+import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { z } from "zod";
 
 import type { ActionResult } from "@/lib/action-result";
-import { applicationPath, initialStatus } from "@/lib/applications";
-import { HOME_PATH } from "@/lib/auth-routes";
+import { APPLICATION_NOT_FOUND, applicationPath, initialStatus } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
-import { NOT_FOUND_MESSAGE, writeErrorMessage } from "@/lib/db-errors";
+import { HOME_PATH } from "@/lib/auth-routes";
+import { writeErrorMessage } from "@/lib/db-errors";
 import {
   type ApplicationFormValues,
   applicationIdSchema,
   applicationSchema,
+  type ArchiveInput,
+  archiveSchema,
   type StatusChangeInput,
   statusChangeSchema,
 } from "@/lib/schemas/application";
 import { createClient } from "@/lib/supabase/server";
+import type { TablesUpdate } from "@/types/database.types";
 
 const INVALID_INPUT = "Check the form and try again.";
+
+function parseOr<S extends z.ZodType>(schema: S, input: unknown): ActionResult<z.output<S>> {
+  const parsed = schema.safeParse(input);
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, error: parsed.error.issues[0]?.message ?? INVALID_INPUT };
+}
+
+/** An RLS-filtered update or delete returns no row rather than an error: that's "not found". */
+function ownedRowResult({
+  data,
+  error,
+}: {
+  data: { id: string } | null;
+  error: PostgrestError | null;
+}): ActionResult<string> {
+  if (error) return { ok: false, error: writeErrorMessage(error) };
+  if (!data) return { ok: false, error: APPLICATION_NOT_FOUND };
+  return { ok: true, data: data.id };
+}
+
+async function updateOwnApplication(
+  userId: string,
+  id: string,
+  patch: TablesUpdate<"applications">,
+): Promise<ActionResult<string>> {
+  const supabase = await createClient();
+  return ownedRowResult(
+    await supabase
+      .from("applications")
+      .update(patch)
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle(),
+  );
+}
+
+async function deleteOwnApplication(userId: string, id: string): Promise<ActionResult<string>> {
+  const supabase = await createClient();
+  return ownedRowResult(
+    await supabase.from("applications").delete().eq("id", id).eq("user_id", userId).select("id").maybeSingle(),
+  );
+}
 
 function revalidateApplication(id: string) {
   revalidatePath(HOME_PATH);
   revalidatePath(applicationPath(id));
 }
 
-/** F2: creates an application in `saved`, or `applied` when a date applied is set, then opens it. */
 export async function createApplication(input: ApplicationFormValues): Promise<ActionResult<never>> {
   await getCurrentUser();
-  const parsed = applicationSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? INVALID_INPUT };
+  const parsed = parseOr(applicationSchema, input);
+  if (!parsed.ok) return parsed;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -42,91 +90,59 @@ export async function createApplication(input: ApplicationFormValues): Promise<A
   redirect(applicationPath(data.id));
 }
 
-/** F2: saves the edit form (content columns only; status changes go through changeStatus). */
+/** Content columns only; status changes go through changeStatus. */
 export async function updateApplication(
   id: string,
   input: ApplicationFormValues,
 ): Promise<ActionResult<never>> {
   const user = await getCurrentUser();
-  const parsedId = applicationIdSchema.safeParse(id);
-  const parsed = applicationSchema.safeParse(input);
-  if (!parsedId.success) return { ok: false, error: NOT_FOUND_MESSAGE };
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? INVALID_INPUT };
+  const parsedId = parseOr(applicationIdSchema, id);
+  if (!parsedId.ok) return parsedId;
+  const parsed = parseOr(applicationSchema, input);
+  if (!parsed.ok) return parsed;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("applications")
-    .update(parsed.data)
-    .eq("id", parsedId.data)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!data) return { ok: false, error: NOT_FOUND_MESSAGE };
+  const result = await updateOwnApplication(user.id, parsedId.data, parsed.data);
+  if (!result.ok) return result;
 
-  revalidateApplication(data.id);
-  redirect(applicationPath(data.id));
+  revalidateApplication(result.data);
+  redirect(applicationPath(result.data));
 }
 
-/** F4: any status to any other (D6). The database trigger records the change in status_events (D5). */
+/** Any status to any other (D6); the database trigger records the change (D5). */
 export async function changeStatus(input: StatusChangeInput): Promise<ActionResult> {
   const user = await getCurrentUser();
-  const parsed = statusChangeSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? INVALID_INPUT };
+  const parsed = parseOr(statusChangeSchema, input);
+  if (!parsed.ok) return parsed;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("applications")
-    .update({ status: parsed.data.status })
-    .eq("id", parsed.data.id)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!data) return { ok: false, error: NOT_FOUND_MESSAGE };
+  const result = await updateOwnApplication(user.id, parsed.data.id, { status: parsed.data.status });
+  if (!result.ok) return result;
 
-  revalidateApplication(data.id);
+  revalidateApplication(result.data);
   return { ok: true, data: undefined };
 }
 
-/** D10: archive hides an application from lists by default; unarchive brings it back. */
-export async function setArchived(id: string, archived: boolean): Promise<ActionResult> {
+export async function setArchived(input: ArchiveInput): Promise<ActionResult> {
   const user = await getCurrentUser();
-  const parsedId = applicationIdSchema.safeParse(id);
-  if (!parsedId.success || typeof archived !== "boolean") return { ok: false, error: NOT_FOUND_MESSAGE };
+  const parsed = parseOr(archiveSchema, input);
+  if (!parsed.ok) return parsed;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("applications")
-    .update({ archived_at: archived ? new Date().toISOString() : null })
-    .eq("id", parsedId.data)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!data) return { ok: false, error: NOT_FOUND_MESSAGE };
+  const archivedAt = parsed.data.archived ? new Date().toISOString() : null;
+  const result = await updateOwnApplication(user.id, parsed.data.id, { archived_at: archivedAt });
+  if (!result.ok) return result;
 
-  revalidateApplication(data.id);
+  revalidateApplication(result.data);
   return { ok: true, data: undefined };
 }
 
-/** F2 / D10: hard delete; notes, contacts, interviews and history cascade in the database. */
+/** Notes, contacts, interviews and history cascade in the database. */
 export async function deleteApplication(id: string): Promise<ActionResult<never>> {
   const user = await getCurrentUser();
-  const parsedId = applicationIdSchema.safeParse(id);
-  if (!parsedId.success) return { ok: false, error: NOT_FOUND_MESSAGE };
+  const parsedId = parseOr(applicationIdSchema, id);
+  if (!parsedId.ok) return parsedId;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("applications")
-    .delete()
-    .eq("id", parsedId.data)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!data) return { ok: false, error: NOT_FOUND_MESSAGE };
+  const result = await deleteOwnApplication(user.id, parsedId.data);
+  if (!result.ok) return result;
 
-  revalidateApplication(data.id);
+  revalidatePath(HOME_PATH);
   redirect(HOME_PATH);
 }
