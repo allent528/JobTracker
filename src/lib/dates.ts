@@ -17,3 +17,24 @@ export function formatDateTime(timestamp: string, timeZone: string): string {
     new Date(timestamp),
   );
 }
+
+/** The calendar date (`YYYY-MM-DD`) of an instant in `timeZone`. */
+export function dateInTimeZone(instant: Date | string, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(instant));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/** Whole calendar days from `from` to `to` (both `YYYY-MM-DD`); negative if `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  const utc = (date: string) => {
+    const [year, month, day] = date.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}

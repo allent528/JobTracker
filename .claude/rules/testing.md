@@ -35,4 +35,7 @@ paths:
 - `getByRole("alert")` also matches Next's empty `#__next-route-announcer__`; filter by text (`.filter({ hasText })`).
 - Signed-in specs use the `signInAs(email, page?)` fixture from `tests/e2e/support/fixtures.ts` (import `test`/`expect` from there): it deletes the user's applications, makes a magic-link token hash with the admin API and opens `/auth/confirm` with it. No email involved. Pass a page from `browser.newContext()` to sign in a second user. Add a user per test to `TEST_USERS`.
 - Hidden, still-mounted routes (docs/learnings.md) mean `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`.
+- `signInAs` ends on `/applications` (`/` redirects there until step 7). Seed fake rows with `seedApplications(email, rows)` from `local-env.ts` after signing in (sign-in clears the user's applications); it inserts with `defaultToNull: false` so rows can leave columns out.
+- Board drag and drop works in Playwright with `page.mouse` down / `move(..., { steps })` / up, starting on the card's padding (not its link or menu).
+- Radix menus can drop the first arrow key after a keyboard open; press until the target item is focused (`expect(...).toPass()`), not a fixed number of times.
 - The magic link is built from `site_url` in `supabase/config.toml`, so it must match Playwright's `baseURL` (`http://localhost:3000`); cookies are per host.

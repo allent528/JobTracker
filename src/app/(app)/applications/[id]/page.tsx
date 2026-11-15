@@ -6,8 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getApplicationOrNotFound, getStatusHistory } from "@/lib/application-queries";
-import { editApplicationPath, formatSalaryRange } from "@/lib/applications";
-import { HOME_PATH } from "@/lib/auth-routes";
+import { APPLICATIONS_PATH, editApplicationPath, formatSalaryRange } from "@/lib/applications";
 import { WORK_MODE_LABELS } from "@/lib/closed-sets";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { getTimeZone } from "@/lib/profile";
@@ -20,7 +19,7 @@ export const metadata: Metadata = { title: "Application · JobTracker" };
 export default function ApplicationPage({ params }: PageProps<"/applications/[id]">) {
   return (
     <div className="grid gap-6">
-      <Link href={HOME_PATH} className="text-sm font-medium underline underline-offset-4 justify-self-start">
+      <Link href={APPLICATIONS_PATH} className="text-sm font-medium underline underline-offset-4 justify-self-start">
         All applications
       </Link>
       <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>

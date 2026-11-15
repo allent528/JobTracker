@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
-import { EMPTY_APPLICATION_FORM } from "@/lib/applications";
-import { HOME_PATH } from "@/lib/auth-routes";
+import { APPLICATIONS_PATH, EMPTY_APPLICATION_FORM } from "@/lib/applications";
 
 import { createApplication } from "../actions";
 import { ApplicationForm } from "../application-form";
@@ -16,7 +15,7 @@ export default function NewApplicationPage() {
         action={createApplication}
         submitLabel="Create application"
         defaultValues={EMPTY_APPLICATION_FORM}
-        cancelHref={HOME_PATH}
+        cancelHref={APPLICATIONS_PATH}
       />
     </section>
   );

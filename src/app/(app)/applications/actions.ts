@@ -6,9 +6,8 @@ import { redirect } from "next/navigation";
 import type { z } from "zod";
 
 import type { ActionResult } from "@/lib/action-result";
-import { APPLICATION_NOT_FOUND, applicationPath, initialStatus } from "@/lib/applications";
+import { APPLICATION_NOT_FOUND, APPLICATIONS_PATH, applicationPath, initialStatus } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
-import { HOME_PATH } from "@/lib/auth-routes";
 import { writeErrorMessage } from "@/lib/db-errors";
 import {
   type ApplicationFormValues,
@@ -69,7 +68,7 @@ async function deleteOwnApplication(userId: string, id: string): Promise<ActionR
 }
 
 function revalidateApplication(id: string) {
-  revalidatePath(HOME_PATH);
+  revalidatePath(APPLICATIONS_PATH);
   revalidatePath(applicationPath(id));
 }
 
@@ -86,7 +85,7 @@ export async function createApplication(input: ApplicationFormValues): Promise<A
     .single();
   if (error) return { ok: false, error: writeErrorMessage(error) };
 
-  revalidatePath(HOME_PATH);
+  revalidatePath(APPLICATIONS_PATH);
   redirect(applicationPath(data.id));
 }
 
@@ -143,6 +142,6 @@ export async function deleteApplication(id: string): Promise<ActionResult<never>
   const result = await deleteOwnApplication(user.id, parsedId.data);
   if (!result.ok) return result;
 
-  revalidatePath(HOME_PATH);
-  redirect(HOME_PATH);
+  revalidatePath(APPLICATIONS_PATH);
+  redirect(APPLICATIONS_PATH);
 }

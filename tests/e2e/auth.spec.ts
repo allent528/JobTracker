@@ -60,17 +60,17 @@ test.describe("at phone width", () => {
     await page.getByLabel(CODE_LABEL).fill(code);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    await expect(page).toHaveURL("/");
+    await expect(page).toHaveURL("/applications");
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     await expectNoHorizontalScroll(page);
 
     await page.goto("/login");
-    await expect(page).toHaveURL("/");
+    await expect(page).toHaveURL("/applications");
 
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL("/login");
-    await page.goto("/");
-    await expect(page).toHaveURL("/login");
+    await page.goto("/applications");
+    await expect(page).toHaveURL("/login?next=%2Fapplications");
   });
 });
 
@@ -83,7 +83,7 @@ test("sign in with the magic link, which works only once", async ({ page }) => {
 
   const link = extractConfirmLink(await latestMessage(email));
   await page.goto(link);
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/applications");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/login");
 

@@ -5,8 +5,8 @@ import { adminClient, findUserByEmail } from "./local-env";
 type Fixtures = {
   /**
    * Signs `target` (default: the test's page) in as an existing test user through `/auth/confirm`
-   * with an admin-generated token hash; no email involved. Deletes the user's applications first,
-   * so each test starts empty.
+   * with an admin-generated token hash (no email involved); `/` then redirects to the pipeline.
+   * Deletes the user's applications first, so each test starts empty.
    */
   signInAs: (email: string, target?: Page) => Promise<void>;
 };
@@ -25,7 +25,7 @@ export const test = base.extend<Fixtures>({
       if (error) throw error;
       const params = new URLSearchParams({ token_hash: data.properties.hashed_token, type: "email" });
       await target.goto(`/auth/confirm?${params}`);
-      await expect(target).toHaveURL("/");
+      await expect(target).toHaveURL("/applications");
     });
   },
 });

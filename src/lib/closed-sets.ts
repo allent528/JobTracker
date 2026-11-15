@@ -14,3 +14,7 @@ export const WORK_MODE_LABELS = {
   hybrid: "Hybrid",
   remote: "Remote",
 } as const satisfies Record<WorkMode, string>;
+
+export function isWorkMode(value: string): value is WorkMode {
+  return (WORK_MODES as readonly string[]).includes(value);
+}
