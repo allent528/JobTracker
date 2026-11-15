@@ -121,3 +121,46 @@
   - Consider custom SMTP; the built-in sender is heavily rate-limited.
 - Deferred to step 4: a reusable `signInAs(page, email)` e2e fixture (admin `generateLink` plus `storageState`), built with the first signed-in flow.
 - Still open from step 1: DB password reset and the read-only MCP decision.
+
+## 2026-11-14: Launch step 3 (Schema)
+**Status:** Done, pending owner review (branch `feat/schema`). Applied to the local stack only; nothing pushed to prod.
+**What was done**
+- Eight migrations, one table or helper each, with its grants, RLS and triggers (all verified with `npx supabase db reset`):
+  - `20261115014501_create_private_helpers`: unexposed `private` schema (no client usage, execute revoked by default) and `private.set_updated_at()`.
+  - `20261115014503_create_profiles`: `profiles` (id = auth user; `time_zone` nullable, no default), RLS select/update own, `authenticated` may only `update (time_zone)`; `private.validate_time_zone()` trigger for non-null values (`invalid_time_zone`, errcode 22023) against `pg_timezone_names`; security definer `private.handle_new_user()` trigger on `auth.users`; backfills profiles for existing users (the owner on prod).
+  - `20261115014504_create_applications`: all PRD columns; `unique (id, user_id)` for the children's composite FKs; checks for status (= `STATUSES`), work_mode, non-blank company/role, `http(s)` job_url, salary >= 0 and min <= max, ISO currency (default USD), text lengths; per-operation RLS; column-level insert/update grants on content columns; updated_at trigger; `private.set_date_applied()` trigger (F4).
+  - `20261115014506_create_status_events`: select-only table (writes revoked from anon, authenticated and service_role); `(application_id, user_id)` composite FK; `changed_at default clock_timestamp()`; security definer `private.log_status_event()` with `after insert` and `after update of status when (old.status is distinct from new.status)` triggers.
+  - `20261115014508_create_notes`, `20261115014510_create_contacts` (http(s) linkedin_url), `20261115014512_create_interviews` (kind, outcome, 1-1440 minute duration checks): `(application_id, user_id)` composite FK to applications; contacts and interviews also `unique (id, application_id)`; text lengths; per-operation RLS on `user_id`; column grants (no `application_id` update).
+  - `20261115014513_create_interview_contacts`: join rows (unique per user, interview and contact) carrying `application_id`, with composite FKs to the application (same user), the interview and the contact (same application); select/insert/delete only.
+- Grants: every table does `revoke all from anon, authenticated`, then grants `authenticated` select/delete plus column-level insert/update on content columns. Clients can't write `id`, `user_id`, timestamps, or a child's `application_id` after insert.
+- Ownership columns: `user_id` FK to `auth.users` + index on every table except `profiles` (its `id` is the user). `status_events.user_id` has no default (trigger-only). Composite FK columns are indexed.
+- `src/lib/closed-sets.ts` (`WORK_MODES`, `INTERVIEW_KINDS`, `INTERVIEW_OUTCOMES`) and `src/lib/limits.ts` (`TEXT_LIMITS`). `src/lib/check-constraints.test.ts` parses the migrations and checks the closed-set and length constraints match the TS constants (step 1 follow-up).
+- RLS suite `tests/rls/rls.test.ts` (`npm run test:rls`, separate `vitest.rls.config.mts`), 29 tests with two fake users:
+  - cross-user read/update/delete on every table; inserts under the other user's parent; `user_id` spoof on insert and update; upsert of the other user's application id; links under the wrong user or with the other user's contact; anon denied everywhere
+  - re-parenting notes, contacts and interviews fails; a link to a contact from another application fails; links can't be updated; profile id can't change
+  - private functions unreachable over `/rest/v1/rpc` (with and without `Content-Profile: private`)
+  - status_events: client writes denied (own rows included); trigger logs the initial status and each change, not no-ops
+  - profile created with null time zone; valid zone accepted, bad zone rejected
+  - date_applied set to today in the owner's zone on insert as applied and on saved to applied; an explicit date is kept
+  - every status accepted; bad closed-set, salary, currency, URL and length values rejected; application delete cascades children and history
+- Regenerated `src/types/database.types.ts` (ASCII).
+**Review fixes (same PR, after verification PASS and security review SAFE)**
+- Security re-review (SAFE): `interview_contacts` unique key now leads with `user_id`, with insert and upsert tests for a forged existing pair.
+- Column-level grants; composite FKs replace the policies' `exists` parent checks; `clock_timestamp()` for `changed_at`; text length limits mirrored in `limits.ts`; nullable `profiles.time_zone`; the F4 date_applied trigger; more attacker-side tests; narration comments removed; rules updated (database.md, testing.md, ui.md).
+**Files:** `supabase/migrations/*.sql` (8), `src/types/database.types.ts`, `src/lib/{closed-sets,limits,check-constraints.test}.ts`, `tests/rls/rls.test.ts`, `vitest.rls.config.mts`, `package.json`, `.claude/CLAUDE.md`, `.claude/rules/{database,testing,ui}.md`, `docs/learnings.md`
+**Checks:** `npx supabase db reset` clean; typecheck, lint, `npm test` (53/53), build with CI placeholder env, `npm run test:e2e` (4/4), `npm run test:rls` (29/29). Mutation checks: weakening the notes insert policy, dropping the status trigger's no-op guard, granting `update (application_id)` on notes and dropping the date_applied trigger each made the RLS suite fail. Local advisors (`npx supabase db advisors --type all --level info`): only `unused_index` INFO on the empty DB (expected); `npx supabase db lint --schema public,private`: no errors. Supabase MCP not used (points at prod).
+**Decisions / defaults**
+- Default currency USD (PRD default); follow-ups are `date`, interviews `timestamptz` (PRD default).
+- `interviews.interviewers` (free text) added: F7 allows interviewers as free text, which the data model had no column for. `interviews.scheduled_at` is required.
+- F4 "setting status to applied with no date applied sets it to today" is a `before insert or update of status` trigger (`private.set_date_applied`, invoker rights) using the owner's `profiles.time_zone`, falling back to UTC. It's in the database for the same reason as D5: no code path can skip it. It isn't a transition check, so D6 holds, and clients can still set `date_applied` explicitly. New applications default to `saved`; F2's "start in applied if a date applied is set" stays in the step 4 Server Action.
+- `profiles.time_zone` is nullable with no default, so step 7 can tell "never detected" (null) from a chosen UTC.
+- Text length limits (defence against oversized writes): 200 for short fields (500 for `follow_up_note` and `interviewers`, 320 for email), 2048 for URLs and `interviews.location`, 20000 for long text.
+- `status_events` has no check on from/to status (only the trigger writes it, copying a checked value), so renaming a status touches one constraint.
+- No stats views yet (step 8, D13). No seed rows: tests create their own users and data.
+- `interview_contacts` is unique on `(user_id, interview_id, contact_id)`. With the pair alone, the unique check (which runs before the FKs) let someone who knew both of another user's UUIDs learn whether they were linked. The security re-review found this and it's closed: a forged pair now always fails the FK (23503).
+**Follow-ups**
+- Prod push of these 8 migrations is an owner-approval item for step 9 (`supabase link` + `db push`).
+- Step 4: Zod schemas must mirror the DB checks (non-blank company/role, http(s) URLs, salary rules, currency `^[A-Z]{3}$`, `TEXT_LIMITS`); map `invalid_time_zone`, 23503 and 23514 to user-facing copy. Use `z.enum(STATUSES)` (`ACTIVE_STATUSES` is `readonly Status[]`, not a tuple). Add WORK_MODE / INTERVIEW labels to `closed-sets.ts` when the forms need them.
+- Step 6: decide whether interviews need a time zone column (today `scheduled_at` is an instant, shown in the owner's zone). Render `interviews.location` as a link only if it is http(s) (ui.md).
+- Step 7: detect the browser time zone on first sign-in when `profiles.time_zone` is null; server code falls back to UTC.
+- Step 8: stats views return raw facts ordered by `changed_at`; classify statuses (active/closed, "screening or later") in TS from `status.ts`, not hard-coded status lists in SQL.

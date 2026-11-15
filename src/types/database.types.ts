@@ -5,7 +5,147 @@ export type Database = {
   
   "public": {
           Tables: {
-            [_ in never]: never
+            "applications": {
+                  Row: {
+                    "archived_at": string | null,"company": string,"created_at": string,"date_applied": string | null,"description": string | null,"follow_up_note": string | null,"id": string,"job_url": string | null,"location": string | null,"next_follow_up_on": string | null,"role_title": string,"salary_currency": string,"salary_max": number | null,"salary_min": number | null,"source": string | null,"status": string,"updated_at": string,"user_id": string,"work_mode": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"company": string,"created_at"?: string,"date_applied"?: string | null,"description"?: string | null,"follow_up_note"?: string | null,"id"?: string,"job_url"?: string | null,"location"?: string | null,"next_follow_up_on"?: string | null,"role_title": string,"salary_currency"?: string,"salary_max"?: number | null,"salary_min"?: number | null,"source"?: string | null,"status"?: string,"updated_at"?: string,"user_id"?: string,"work_mode"?: string | null
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"company"?: string,"created_at"?: string,"date_applied"?: string | null,"description"?: string | null,"follow_up_note"?: string | null,"id"?: string,"job_url"?: string | null,"location"?: string | null,"next_follow_up_on"?: string | null,"role_title"?: string,"salary_currency"?: string,"salary_max"?: number | null,"salary_min"?: number | null,"source"?: string | null,"status"?: string,"updated_at"?: string,"user_id"?: string,"work_mode"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"contacts": {
+                  Row: {
+                    "application_id": string,"created_at": string,"email": string | null,"id": string,"linkedin_url": string | null,"name": string,"notes": string | null,"phone": string | null,"title": string | null,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "application_id": string,"created_at"?: string,"email"?: string | null,"id"?: string,"linkedin_url"?: string | null,"name": string,"notes"?: string | null,"phone"?: string | null,"title"?: string | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "application_id"?: string,"created_at"?: string,"email"?: string | null,"id"?: string,"linkedin_url"?: string | null,"name"?: string,"notes"?: string | null,"phone"?: string | null,"title"?: string | null,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "contacts_application_fkey"
+      columns: ["application_id","user_id"]
+isOneToOne: false
+      referencedRelation: "applications"
+      referencedColumns: ["id","user_id"]
+    }
+                  ]
+                },"interview_contacts": {
+                  Row: {
+                    "application_id": string,"contact_id": string,"created_at": string,"id": string,"interview_id": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "application_id": string,"contact_id": string,"created_at"?: string,"id"?: string,"interview_id": string,"user_id"?: string
+                  }
+                  Update: {
+                    "application_id"?: string,"contact_id"?: string,"created_at"?: string,"id"?: string,"interview_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "interview_contacts_application_fkey"
+      columns: ["application_id","user_id"]
+isOneToOne: false
+      referencedRelation: "applications"
+      referencedColumns: ["id","user_id"]
+    },{
+      foreignKeyName: "interview_contacts_contact_fkey"
+      columns: ["contact_id","application_id"]
+isOneToOne: false
+      referencedRelation: "contacts"
+      referencedColumns: ["id","application_id"]
+    },{
+      foreignKeyName: "interview_contacts_interview_fkey"
+      columns: ["interview_id","application_id"]
+isOneToOne: false
+      referencedRelation: "interviews"
+      referencedColumns: ["id","application_id"]
+    }
+                  ]
+                },"interviews": {
+                  Row: {
+                    "application_id": string,"created_at": string,"duration_minutes": number | null,"id": string,"interviewers": string | null,"kind": string,"location": string | null,"notes": string | null,"outcome": string,"scheduled_at": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "application_id": string,"created_at"?: string,"duration_minutes"?: number | null,"id"?: string,"interviewers"?: string | null,"kind": string,"location"?: string | null,"notes"?: string | null,"outcome"?: string,"scheduled_at": string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "application_id"?: string,"created_at"?: string,"duration_minutes"?: number | null,"id"?: string,"interviewers"?: string | null,"kind"?: string,"location"?: string | null,"notes"?: string | null,"outcome"?: string,"scheduled_at"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "interviews_application_fkey"
+      columns: ["application_id","user_id"]
+isOneToOne: false
+      referencedRelation: "applications"
+      referencedColumns: ["id","user_id"]
+    }
+                  ]
+                },"notes": {
+                  Row: {
+                    "application_id": string,"body": string,"created_at": string,"id": string,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "application_id": string,"body": string,"created_at"?: string,"id"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Update: {
+                    "application_id"?: string,"body"?: string,"created_at"?: string,"id"?: string,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notes_application_fkey"
+      columns: ["application_id","user_id"]
+isOneToOne: false
+      referencedRelation: "applications"
+      referencedColumns: ["id","user_id"]
+    }
+                  ]
+                },"profiles": {
+                  Row: {
+                    "created_at": string,"id": string,"time_zone": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"id": string,"time_zone"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"id"?: string,"time_zone"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"status_events": {
+                  Row: {
+                    "application_id": string,"changed_at": string,"created_at": string,"from_status": string | null,"id": string,"to_status": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "application_id": string,"changed_at"?: string,"created_at"?: string,"from_status"?: string | null,"id"?: string,"to_status": string,"user_id": string
+                  }
+                  Update: {
+                    "application_id"?: string,"changed_at"?: string,"created_at"?: string,"from_status"?: string | null,"id"?: string,"to_status"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "status_events_application_fkey"
+      columns: ["application_id","user_id"]
+isOneToOne: false
+      referencedRelation: "applications"
+      referencedColumns: ["id","user_id"]
+    }
+                  ]
+                }
           }
           Views: {
             [_ in never]: never
