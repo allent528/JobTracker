@@ -11,7 +11,7 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 ## Conventions
 - Components come from shadcn/ui (`npx shadcn@latest add <component>`, or the shadcn MCP). `src/components/ui/` is generated, so restyle via Tailwind theme tokens, not by forking components.
 - Server Components by default; add `'use client'` only for interactivity (forms, board drag, charts).
-- Forms: react-hook-form + `zodResolver` with the same schema the Server Action uses; show field errors inline and the action's `error` in a toast.
+- Forms: react-hook-form + `zodResolver` with the same schema the Server Action uses; show field errors inline and the action's `error` in a toast. Exception: the sign-in form shows action errors inline in a `role="alert"` paragraph (one small card, no toast library needed yet).
 - Board (F3): `@dnd-kit/core`, one droppable per active status, `useOptimistic` for the move with rollback on error (D12). Card order is automatic (D9); no reorder within a column.
 - Status labels, colors and order come from `src/lib/status.ts`. Never hard-code a status string in JSX.
 - Dates are formatted with `src/lib/dates.ts` helpers in the owner's time zone.
