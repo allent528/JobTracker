@@ -18,3 +18,22 @@ export const WORK_MODE_LABELS = {
 export function isWorkMode(value: string): value is WorkMode {
   return (WORK_MODES as readonly string[]).includes(value);
 }
+
+export const INTERVIEW_KIND_LABELS = {
+  phone_screen: "Phone screen",
+  technical: "Technical",
+  behavioral: "Behavioral",
+  onsite: "Onsite",
+  final: "Final",
+  other: "Other",
+} as const satisfies Record<InterviewKind, string>;
+
+export const INTERVIEW_OUTCOME_LABELS = {
+  pending: "Pending",
+  passed: "Passed",
+  failed: "Failed",
+  cancelled: "Cancelled",
+} as const satisfies Record<InterviewOutcome, string>;
+
+/** New rounds start here (the column default); only pending rounds count as upcoming. */
+export const PENDING_OUTCOME = "pending" satisfies InterviewOutcome;

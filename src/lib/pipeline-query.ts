@@ -1,9 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { WorkMode } from "@/lib/closed-sets";
 import { type DateOnly, dateInTimeZone, daysBetween } from "@/lib/dates";
 import type { PipelineItem } from "@/lib/pipeline";
-import type { Status } from "@/lib/status";
+import { storedStatus, storedWorkMode } from "@/lib/stored";
 import type { Database } from "@/types/database.types";
 
 // Kept apart from application-queries.ts (server-only) so the local-stack suite can run the real query.
@@ -25,14 +24,13 @@ export function selectPipeline(supabase: SupabaseClient<Database>, userId: strin
 
 type PipelineRow = NonNullable<Awaited<ReturnType<typeof selectPipeline>>["data"]>[number];
 
-// The casts are the narrowing described in application-queries.ts (check constraints keep them safe).
 export function toPipelineItems(rows: PipelineRow[], timeZone: string, today: DateOnly): PipelineItem[] {
   return rows.map(({ status_events, created_at, status, work_mode, ...row }) => {
     const statusStartedAt = status_events[0]?.changed_at ?? created_at;
     return {
       ...row,
-      status: status as Status,
-      work_mode: work_mode as WorkMode | null,
+      status: storedStatus(status),
+      work_mode: storedWorkMode(work_mode),
       days_in_status: daysBetween(dateInTimeZone(statusStartedAt, timeZone), today),
     };
   });

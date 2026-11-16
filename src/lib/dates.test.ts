@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { dateInTimeZone, daysBetween, formatDate, formatDateTime } from "./dates";
+import {
+  dateInTimeZone,
+  daysBetween,
+  formatDate,
+  formatDateTime,
+  formatDateTimeWithZone,
+  instantToLocalDateTime,
+  localDateTimeToInstant,
+  startOfDayInstant,
+} from "./dates";
 
 describe("formatDate", () => {
   it("formats a date-only value without shifting the day", () => {
@@ -43,5 +52,61 @@ describe("daysBetween", () => {
   it("isn't thrown off by DST or leap days", () => {
     expect(daysBetween("2026-03-07", "2026-03-09")).toBe(2);
     expect(daysBetween("2028-02-28", "2028-03-01")).toBe(2);
+  });
+});
+
+describe("localDateTimeToInstant / instantToLocalDateTime", () => {
+  const roundTrip = (local: string, zone: string) => instantToLocalDateTime(localDateTimeToInstant(local, zone), zone);
+
+  it("reads a wall-clock time in the given zone", () => {
+    expect(localDateTimeToInstant("2026-12-01T10:00", "America/New_York").toISOString()).toBe("2026-12-01T15:00:00.000Z");
+    expect(localDateTimeToInstant("2026-07-01T10:00", "America/New_York").toISOString()).toBe("2026-07-01T14:00:00.000Z");
+    expect(localDateTimeToInstant("2026-12-01T10:00", "UTC").toISOString()).toBe("2026-12-01T10:00:00.000Z");
+    expect(localDateTimeToInstant("2026-12-01T09:30", "Asia/Kolkata").toISOString()).toBe("2026-12-01T04:00:00.000Z");
+    expect(localDateTimeToInstant("2027-01-01T00:15", "Pacific/Auckland").toISOString()).toBe("2026-12-31T11:15:00.000Z");
+  });
+
+  it("round-trips across zones and around midnight", () => {
+    for (const zone of ["UTC", "America/New_York", "America/Los_Angeles", "Europe/London", "Asia/Tokyo", "Australia/Adelaide"]) {
+      for (const local of ["2026-03-08T00:00", "2026-11-01T23:59", "2026-06-15T12:30", "2028-02-29T07:45"]) {
+        expect(roundTrip(local, zone)).toBe(local);
+      }
+    }
+  });
+
+  it("handles the US DST changes", () => {
+    // 2026-03-08 02:30 doesn't exist in New York; it becomes 03:30 EDT.
+    expect(localDateTimeToInstant("2026-03-08T02:30", "America/New_York").toISOString()).toBe("2026-03-08T07:30:00.000Z");
+    expect(localDateTimeToInstant("2026-03-08T03:30", "America/New_York").toISOString()).toBe("2026-03-08T07:30:00.000Z");
+    // 2026-11-01 01:30 happens twice; the first (EDT) wins.
+    expect(localDateTimeToInstant("2026-11-01T01:30", "America/New_York").toISOString()).toBe("2026-11-01T05:30:00.000Z");
+    expect(localDateTimeToInstant("2026-11-01T02:30", "America/New_York").toISOString()).toBe("2026-11-01T07:30:00.000Z");
+  });
+
+  it("shows an instant on the zone's wall clock", () => {
+    expect(instantToLocalDateTime("2026-12-01T15:00:00Z", "America/New_York")).toBe("2026-12-01T10:00");
+    expect(instantToLocalDateTime("2026-12-01T00:05:00Z", "America/Los_Angeles")).toBe("2026-11-30T16:05");
+  });
+});
+
+describe("formatDateTimeWithZone", () => {
+  it("appends the zone's short name", () => {
+    expect(formatDateTimeWithZone("2026-12-01T15:00:00Z", "America/New_York")).toBe("Dec 1, 2026, 10:00 AM EST");
+    expect(formatDateTimeWithZone("2026-07-01T14:00:00Z", "America/New_York")).toBe("Jul 1, 2026, 10:00 AM EDT");
+    expect(formatDateTimeWithZone("2026-12-01T15:00:00Z", "UTC")).toBe("Dec 1, 2026, 3:00 PM UTC");
+  });
+});
+
+describe("startOfDayInstant", () => {
+  it("is midnight in the zone", () => {
+    expect(startOfDayInstant("2026-12-01", "America/New_York").toISOString()).toBe("2026-12-01T05:00:00.000Z");
+    expect(startOfDayInstant("2026-12-01", "UTC").toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    expect(startOfDayInstant("2026-12-01", "Asia/Tokyo").toISOString()).toBe("2026-11-30T15:00:00.000Z");
+  });
+
+  it("round-trips years 1900 to 2999", () => {
+    for (const local of ["1900-01-01T00:00", "1969-12-31T23:59", "2999-12-31T23:59"]) {
+      expect(instantToLocalDateTime(localDateTimeToInstant(local, "America/New_York"), "America/New_York")).toBe(local);
+    }
   });
 });

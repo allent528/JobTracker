@@ -271,3 +271,43 @@
 - A board left open past midnight keeps the server's "today" until the next refresh (D11). Acceptable.
 - Step 8: average days per stage needs its own `status_events` query; the pipeline query only embeds the newest event.
 - Over 1000 applications the pipeline query would hit PostgREST's row cap; paginate or filter server-side then.
+
+## 2026-11-15: Launch step 6 (Detail page: notes, contacts, interviews, F5–F7)
+**Status:** Done, pending owner review (PR 6, branch `feat/detail-sections`). Review fixes applied 2026-11-15. No migration; nothing touched prod.
+**What was done**
+- `/applications/[id]` now has Interviews, Contacts, Notes and Status history sections.
+- The page fetches history, notes, contacts, interviews and the time zone in one `Promise.all`. Each section is a small server component in `[id]/sections.tsx`; the forms are client islands (`notes.tsx`, `contacts.tsx`, `interviews.tsx`) built on `[id]/section-ui.tsx`.
+- Notes (F5): add, inline edit, delete with confirm. Newest first, with "Added" and "Edited" times in the owner's zone. The add form clears after saving.
+- Contacts (F6): name (required), role or title, email, phone, LinkedIn URL and notes. Add, inline edit, delete with confirm. Email and phone are `mailto:` / `tel:` links; LinkedIn opens with `rel="noopener noreferrer"`.
+- Interviews (F7): type, date and time, duration, location or video link, interviewers, outcome and notes. Add, inline edit, delete with confirm.
+  - Interviewers are checkboxes over the application's contacts (stored in `interview_contacts`) plus free text (`interviews.interviewers`).
+  - Location is a link only when it's an http(s) URL.
+  - Adding the first interview while Applied or Screening shows "Move the application to Interviewing?" with a button and "Not now". The banner only shows while the current status is still Applied or Screening. Nothing changes on its own.
+- Server Actions in `[id]/actions.ts`. Each one parses the id and input with `parseRequest`, which re-checks the user and uses Zod schemas that mirror the DB checks and `TEXT_LIMITS`. Actions write only granted columns, map errors with `writeErrorMessage` and revalidate the detail page.
+- `src/lib/owned-rows.ts` holds every owned-row write: applications plus `insertChild` / `updateOwnChild` / `deleteOwnChild`. Not-found messages come from the table (`NOT_FOUND`).
+- `src/lib/stored.ts` is the one place stored closed-set text becomes `Status` / `WorkMode` / `InterviewKind` / `InterviewOutcome`.
+- `dates.ts`: `localDateTimeToInstant`, `instantToLocalDateTime` (DST-aware), `startOfDayInstant`, `formatDateTimeWithZone`. `follow-ups.ts`: `interviewDueState`.
+- For step 7: `listUpcomingInterviews({ from, until })` takes owner-zone dates and returns pending rounds on unarchived applications, soonest first. `[id]/actions.ts` has `INTERVIEW_LIST_PATHS` for the pages to revalidate on interview writes.
+**Tests**
+- Unit (133): note, contact and interview schemas (every mirrored check, the 1900–2999 year range, the 50-interviewer cap); zone conversion across zones, midnight and the US DST gap and overlap; `startOfDayInstant`; `interviewDueState`; detail helpers; `isHttpUrl`; `suggestsInterviewing`.
+- Local stack: `tests/rls/upcoming-interviews.test.ts` (2 tests: range bounds, outcome and archived filters, order; another user's rows never returned).
+- E2E `tests/e2e/detail.spec.ts`, main flow at 375px: add, edit and delete a note, a contact and an interview with a picked contact interviewer; validation messages; reload keeps everything; no horizontal scroll; no browser console errors or warnings.
+- E2E, interview cases: the Interviewing suggestion and its history entry; changing interviewers; deleting a contact removes it from a round; a contact deleted while the Add or the Edit form is open doesn't stop the save. Without the client filter that last case fails (checked).
+- E2E, isolation: a second user gets the not-found page and none of the owner's notes, contacts or interviews.
+**Checks:** typecheck, lint, `npm test` (133), build with the CI placeholder env, `npm run test:e2e` (14/14), `npm run test:rls` (32/32). Verification PASS; security review SAFE (live cross-user probes refused); five code-quality passes applied.
+**Decisions / defaults**
+- Interview time zone: PRD default "interviews use `timestamptz`", so no time zone column and no migration. The form's date and time are read in the owner's `profiles.time_zone` (UTC until step 7) and shown with the zone's short name ("10:00 AM EST"). A time skipped by DST keeps the earlier offset (2:30 becomes 3:30); a repeated time takes its first occurrence. Years are limited to 1900–2999.
+- Notes are stored as typed and shown as plain text with line breaks kept. Markdown is not rendered.
+- Contacts are listed in the order added, interviews in schedule order, notes newest first (F5).
+- Email must look like an email address when given (Zod only; the DB checks length only). Phone is free text.
+- Deleting a contact removes it from the interviews it was picked on (FK cascade); the interview stays. The confirm dialog says so.
+- Interviewer links are written after the interview row, so the writes aren't atomic. On add, a failed link insert deletes the new interview, and revalidates if that delete fails so a leftover row shows. On edit, the other field changes stay saved and the error toast shows.
+- On edit, links not in the new set are deleted and the set is upserted with `ignoreDuplicates`. This works with the column-level insert grant (checked on the local stack).
+- Interviewers picked from contacts are capped at 50.
+- Upcoming interviews for F8: pending outcome only, archived applications excluded.
+**Follow-ups**
+- Step 7: add `/` to `INTERVIEW_LIST_PATHS`; use `listUpcomingInterviews` and `interviewDueState`.
+- Atomic interview + links write as an RPC (needs a migration and a security review).
+- Move `TextField`, `ConfirmDeleteButton` and the action hook to a shared module. Rebuild the application form's `TextField`, `DeleteButton`, `useChangeStatus` and `ArchiveButton` (which doesn't catch rejections) on them.
+- Move the contact and interview form-value mappers next to their schemas.
+- E2E only runs in UTC; time-zone conversion is covered by unit tests. Add a desktop-width run of the detail flow.

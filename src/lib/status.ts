@@ -41,3 +41,10 @@ export function isStatus(value: string): value is Status {
   return (STATUSES as readonly string[]).includes(value);
 }
 
+// Adding the first interview while in one of these suggests, never forces, moving on.
+const SUGGEST_INTERVIEWING_FROM: readonly Status[] = ["applied", "screening"];
+export const INTERVIEWING_STATUS = "interviewing" satisfies Status;
+
+export function suggestsInterviewing(status: Status, interviewCount: number): boolean {
+  return interviewCount === 1 && SUGGEST_INTERVIEWING_FROM.includes(status);
+}

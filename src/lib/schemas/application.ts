@@ -4,6 +4,8 @@ import { WORK_MODES } from "@/lib/closed-sets";
 import { TEXT_LIMITS } from "@/lib/limits";
 import { STATUSES } from "@/lib/status";
 
+import { optionalHttpUrl, optionalText, requiredText } from "./fields";
+
 const LIMITS = TEXT_LIMITS.applications;
 
 /** Largest value a Postgres `integer` column holds. */
@@ -11,38 +13,7 @@ export const SALARY_MAX_VALUE = 2_147_483_647;
 
 export const DEFAULT_CURRENCY = "USD";
 
-const HTTP_URL = /^https?:\/\//i;
 const WHOLE_NUMBER = /^\d+$/;
-
-function tooLong(max: number) {
-  return `Keep this to ${max.toLocaleString("en-US")} characters or fewer.`;
-}
-
-function requiredText(label: string, max: number) {
-  return z
-    .string()
-    .trim()
-    .min(1, { error: `Enter the ${label}.` })
-    .max(max, { error: tooLong(max) });
-}
-
-/** Blank becomes null. */
-function optionalText(max: number) {
-  return z
-    .string()
-    .trim()
-    .max(max, { error: tooLong(max) })
-    .transform((value) => value || null);
-}
-
-const jobUrl = z
-  .string()
-  .trim()
-  .max(LIMITS.job_url, { error: tooLong(LIMITS.job_url) })
-  .refine((value) => value === "" || (HTTP_URL.test(value) && URL.canParse(value)), {
-    error: "Enter a full link starting with http:// or https://.",
-  })
-  .transform((value) => value || null);
 
 /** Whole currency units; commas are allowed for readability ("120,000"). Blank becomes null. */
 const salary = z
@@ -81,7 +52,7 @@ export const applicationSchema = z
   .object({
     company: requiredText("company", LIMITS.company),
     role_title: requiredText("role title", LIMITS.role_title),
-    job_url: jobUrl,
+    job_url: optionalHttpUrl(LIMITS.job_url),
     location: optionalText(LIMITS.location),
     work_mode: workMode,
     salary_min: salary,
