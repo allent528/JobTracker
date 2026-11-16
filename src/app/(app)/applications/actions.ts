@@ -1,14 +1,13 @@
 "use server";
 
-import type { PostgrestError } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { z } from "zod";
 
-import type { ActionResult } from "@/lib/action-result";
-import { APPLICATION_NOT_FOUND, APPLICATIONS_PATH, applicationPath, initialStatus } from "@/lib/applications";
+import { type ActionResult, parseOr } from "@/lib/action-result";
+import { APPLICATIONS_PATH, applicationPath, initialStatus } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
 import { writeErrorMessage } from "@/lib/db-errors";
+import { deleteOwnApplication, updateOwnApplication } from "@/lib/owned-rows";
 import {
   type ApplicationFormValues,
   applicationIdSchema,
@@ -19,53 +18,6 @@ import {
   statusChangeSchema,
 } from "@/lib/schemas/application";
 import { createClient } from "@/lib/supabase/server";
-import type { TablesUpdate } from "@/types/database.types";
-
-const INVALID_INPUT = "Check the form and try again.";
-
-function parseOr<S extends z.ZodType>(schema: S, input: unknown): ActionResult<z.output<S>> {
-  const parsed = schema.safeParse(input);
-  return parsed.success
-    ? { ok: true, data: parsed.data }
-    : { ok: false, error: parsed.error.issues[0]?.message ?? INVALID_INPUT };
-}
-
-/** An RLS-filtered update or delete returns no row rather than an error: that's "not found". */
-function ownedRowResult({
-  data,
-  error,
-}: {
-  data: { id: string } | null;
-  error: PostgrestError | null;
-}): ActionResult<string> {
-  if (error) return { ok: false, error: writeErrorMessage(error) };
-  if (!data) return { ok: false, error: APPLICATION_NOT_FOUND };
-  return { ok: true, data: data.id };
-}
-
-async function updateOwnApplication(
-  userId: string,
-  id: string,
-  patch: TablesUpdate<"applications">,
-): Promise<ActionResult<string>> {
-  const supabase = await createClient();
-  return ownedRowResult(
-    await supabase
-      .from("applications")
-      .update(patch)
-      .eq("id", id)
-      .eq("user_id", userId)
-      .select("id")
-      .maybeSingle(),
-  );
-}
-
-async function deleteOwnApplication(userId: string, id: string): Promise<ActionResult<string>> {
-  const supabase = await createClient();
-  return ownedRowResult(
-    await supabase.from("applications").delete().eq("id", id).eq("user_id", userId).select("id").maybeSingle(),
-  );
-}
 
 /** Every page that lists applications. Step 7 adds the home page (`/`) here. */
 function revalidatePipeline() {

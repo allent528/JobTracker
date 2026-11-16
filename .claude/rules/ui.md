@@ -40,3 +40,7 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 - Follow-up dates show `<FollowUpBadge state={followUpState(date, today)} />` from `src/components/follow-up-badge.tsx`.
 - An `overflow-x-auto` container that holds absolutely positioned content (including `sr-only` text) needs `relative`. Otherwise that content widens the page past 375px.
 - A page that only redirects must do it at request time: `connection()`, then `redirect()`, inside `<Suspense>`. See docs/learnings.md.
+- Detail sections (notes, contacts, interviews) are server components in `[id]/sections.tsx` with client islands (`notes.tsx`, `contacts.tsx`, `interviews.tsx`). Shared pieces are in `[id]/section-ui.tsx`: `useSectionAction()` (transition + try/catch + toast), generic `TextField` / `TextAreaField`, `FormButtons` and `ConfirmDeleteButton`.
+- Each list item is keyed `${id}:${updated_at}`, so a saved inline edit remounts it in view mode with fresh values. Add forms clear by bumping a `key`.
+- Repeated row buttons get distinct accessible names (`Edit note added <time>`, `Delete contact Jane Doe`), not a bare "Edit".
+- Notes render as plain text (`whitespace-pre-wrap`); Markdown is stored as typed, never rendered as HTML.

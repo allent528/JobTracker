@@ -44,3 +44,5 @@ paths:
 - The local-stack suite shares sign-in helpers through `tests/rls/support.ts`. Give each file its own fake user, so files and parallel runs don't touch each other's rows.
 - Setup that no client role may do (such as backdating `status_events`) goes through `localSuperuserQuery(sql)` in `tests/rls/support.ts`. It runs the Supabase CLI's `db query`, which targets the local stack because the repo is never linked.
 - The magic link is built from `site_url` in `supabase/config.toml`, so it must match Playwright's `baseURL` (`http://localhost:3000`); cookies are per host.
+- `getByLabel` also matches `aria-label` on buttons ("Edit note" matched both a textarea and an Edit button). Use `getByRole("textbox", { name })` when a field's label repeats in a button's name.
+- `tests/e2e/detail.spec.ts` collects console errors and warnings plus page errors and expects none at the end; copy `collectConsoleErrors` for new UI specs.

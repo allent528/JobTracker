@@ -122,3 +122,15 @@
 - **Root cause:** Errors thrown inside a transition go to the nearest error boundary. Returning `ActionResult` covers only failures the server reports.
 - **Fix:** `useChangeStatus` wraps the call in try/catch and toasts `UNREACHABLE_ERROR`; the optimistic move rolls back when the transition ends. `src/app/(app)/error.tsx` is a safety net for anything else. An e2e aborts the action request with `page.route` and fails without the try/catch.
 - **Lesson:** Client calls to Server Actions inside a transition catch rejections. Recorded in `.claude/rules/ui.md`.
+
+## 2026-11-15: supabase-js can't type `.from()` over a union of table names
+- **Mistake:** A generic `updateOwnChild<T extends "notes" | "contacts" | "interviews">(table: T, patch: TablesUpdate<T>)` failed to typecheck: `.update(patch)` and even `.eq("id", …)` were rejected.
+- **Root cause:** supabase-js resolves the builder's row types from a single literal table name; a generic or union parameter leaves them unresolved.
+- **Fix:** `owned-rows.ts` checks the caller's row against `TablesInsert<T>` / `TablesUpdate<T>` at the call site, then types the builder as one table (`table as "notes"`). Every child table shares the `id`, `user_id` and `application_id` columns the helper uses.
+- **Lesson:** Keep table-generic helpers' type safety at the boundary (the generic signature); don't fight the builder's types inside. Recorded in `.claude/rules/server-actions.md`.
+
+## 2026-11-15: `getByLabel` also matches `aria-label`
+- **Mistake:** The e2e's `getByLabel("Edit note")` matched the edit textarea and the note's Edit button (whose `aria-label` was "Edit note"). Several notes would also have had identical "Edit note" buttons for screen-reader users.
+- **Root cause:** Playwright's `getByLabel` matches `aria-label` as well as `<label>` text.
+- **Fix:** Row buttons now carry distinct names ("Edit note added Nov 15, 2026, 9:05 PM", "Delete contact Jane Doe"); the spec finds the field with `getByRole("textbox", { name: "Edit note" })`.
+- **Lesson:** Repeated row actions need distinct accessible names; in e2e prefer role locators when a label's text also appears in a button name. Recorded in ui.md and testing.md.

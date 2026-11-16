@@ -16,6 +16,9 @@ export const TEST_USERS = {
   pipelineDrag: "e2e-pipeline-drag@example.com",
   pipelinePhone: "e2e-pipeline-phone@example.com",
   pipelineRollback: "e2e-pipeline-rollback@example.com",
+  detailSections: "e2e-detail-sections@example.com",
+  detailIsolationOwner: "e2e-detail-isolation-owner@example.com",
+  detailIsolationOther: "e2e-detail-isolation-other@example.com",
 } as const;
 
 /** Must never have an account; global setup deletes it if a past run left one. */

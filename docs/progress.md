@@ -271,3 +271,33 @@
 - A board left open past midnight keeps the server's "today" until the next refresh (D11). Acceptable.
 - Step 8: average days per stage needs its own `status_events` query; the pipeline query only embeds the newest event.
 - Over 1000 applications the pipeline query would hit PostgREST's row cap; paginate or filter server-side then.
+
+## 2026-11-15: Launch step 6 (Detail page: notes, contacts, interviews, F5–F7)
+**Status:** Done, pending owner review (branch `feat/detail-sections`). No migration; nothing touched prod.
+**What was done**
+- `/applications/[id]` now has Interviews, Contacts, Notes and Status history sections. The page fetches history, notes, contacts, interviews and the time zone in one `Promise.all`; each section is a small server component (`[id]/sections.tsx`) with client islands for the forms (`notes.tsx`, `contacts.tsx`, `interviews.tsx`, shared `section-ui.tsx`).
+- F5 notes: add (form clears), inline edit, delete with confirm; newest first; "Added …" and "Edited …" times in the owner's zone.
+- F6 contacts: add, inline edit, delete with confirm; every field. Email and phone render as `mailto:` / `tel:` links, LinkedIn with `rel="noopener noreferrer"`.
+- F7 interviews: add, inline edit, delete with confirm; type, date and time, duration, location or video link, interviewers (checkboxes over the application's contacts, stored in `interview_contacts`, plus free text in `interviews.interviewers`), outcome, notes. Location is a link only when it's an http(s) URL. Adding the first interview while Applied or Screening shows "Move the application to Interviewing?" with a button (the existing `useChangeStatus`) and "Not now"; nothing changes on its own.
+- Server Actions in `[id]/actions.ts`: re-check the user, parse with shared Zod schemas (`src/lib/schemas/{note,contact,interview}.ts`, mirroring the DB checks and `TEXT_LIMITS`), write only granted columns, map errors with `writeErrorMessage`, revalidate the detail page.
+- Lifted the owned-row helpers to `src/lib/owned-rows.ts` (applications plus `insertChild` / `updateOwnChild` / `deleteOwnChild` for the child tables); `parseOr` moved to `action-result.ts`; shared Zod field builders in `schemas/fields.ts` (the application schema uses them).
+- `src/lib/dates.ts`: `localDateTimeToInstant`, `instantToLocalDateTime` (DST-aware) and `formatDateTimeWithZone`. `src/lib/detail.ts`: row types, form-value mappers, `interviewerNames`, `formatDuration`, `wasEdited`. `closed-sets.ts`: interview kind/outcome labels and `PENDING_OUTCOME`. `status.ts`: `suggestsInterviewing`, `INTERVIEWING_STATUS`.
+- For step 7: `listUpcomingInterviews({ from, until })` in application-queries.ts over `selectUpcomingInterviews` in `src/lib/interview-query.ts` (pending only, not archived, soonest first, with company/role/status).
+**Tests**
+- Unit: note/contact/interview schemas (every mirrored check), zone conversion across zones, midnight, and the US DST gap and overlap, `formatDateTimeWithZone`, detail helpers, `isHttpUrl`, `suggestsInterviewing`, labels. `npm test` 128/128.
+- Local stack: `tests/rls/upcoming-interviews.test.ts` (range bounds, outcome and archived filters, ordering, another user's rows never returned even when asked with their id).
+- E2E `tests/e2e/detail.spec.ts` (3 new users): at 375px add/edit/delete a note, a contact and an interview with a picked contact interviewer; validation messages; the Interviewing suggestion and its history entry; editing interviewers; deleting a contact removes it from the round; a second interview doesn't suggest again; reload keeps everything; no horizontal scroll; no browser console errors or warnings. A second user gets the not-found page and none of the owner's notes, contacts or interviews.
+**Checks:** typecheck, lint, `npm test`, build (CI placeholder env), `npm run test:e2e` (14/14), `npm run test:rls` (32/32).
+**Decisions / defaults**
+- Interview time zone: PRD default "interviews use `timestamptz`", so no time zone column and no migration. The form's date and time are read in the owner's `profiles.time_zone` (UTC until step 7 detects it) and shown with the zone's short name ("10:00 AM EST"). A time skipped by DST resolves under the earlier offset (2:30 becomes 3:30); a repeated time takes its first occurrence.
+- Notes: "plain text or Markdown" is met by storing the text as typed and showing it as plain text with line breaks kept. No Markdown rendering (no new dependency, no HTML from user text). Revisit if the owner wants formatted notes.
+- Contacts are listed in the order added; interviews in schedule order; notes newest first (F5).
+- Email must look like an email address when given (Zod only; the DB has a length check only). Phone is free text.
+- Deleting a contact removes it from interviews it was picked on (the FK cascade); the interview stays. The confirm dialog says so.
+- Interviewer links are written after the interview row (no RPC, so no migration). A failed link insert on create deletes the new interview; on edit the row change stays and the error toast shows.
+- The Interviewing suggestion appears only right after adding the first interview (F7 "suggests"); dismissing it is client state.
+- Upcoming interviews for F8: pending outcome only, archived applications excluded; step 7 picks the ranges.
+**Follow-ups**
+- Step 7: add `/` to the interview actions' revalidation (`revalidateDetail` in `[id]/actions.ts`) and use `listUpcomingInterviews`.
+- If interviewer sync ever needs to be atomic, move it into a security-invoker RPC (needs a migration).
+- Security review requested by the lead (personal data: contacts' emails and phones).

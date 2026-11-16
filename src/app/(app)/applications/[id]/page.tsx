@@ -5,14 +5,20 @@ import { Suspense } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getApplicationOrNotFound, getStatusHistory } from "@/lib/application-queries";
+import {
+  getApplicationOrNotFound,
+  getStatusHistory,
+  listContacts,
+  listInterviews,
+  listNotes,
+} from "@/lib/application-queries";
 import { APPLICATIONS_PATH, editApplicationPath, formatSalaryRange } from "@/lib/applications";
 import { WORK_MODE_LABELS } from "@/lib/closed-sets";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { getTimeZone } from "@/lib/profile";
-import { STATUS_META } from "@/lib/status";
 
 import { ArchiveButton, DeleteButton, StatusControl } from "./application-controls";
+import { ContactsSection, HistorySection, InterviewsSection, NotesSection } from "./sections";
 
 export const metadata: Metadata = { title: "Application · JobTracker" };
 
@@ -32,7 +38,13 @@ export default function ApplicationPage({ params }: PageProps<"/applications/[id
 async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]">, "params">) {
   const { id } = await params;
   const app = await getApplicationOrNotFound(id);
-  const [history, timeZone] = await Promise.all([getStatusHistory(app.id), getTimeZone()]);
+  const [history, notes, contacts, interviews, timeZone] = await Promise.all([
+    getStatusHistory(app.id),
+    listNotes(app.id),
+    listContacts(app.id),
+    listInterviews(app.id),
+    getTimeZone(),
+  ]);
   const archived = app.archived_at !== null;
 
   const details: [label: string, value: React.ReactNode][] = [
@@ -99,25 +111,10 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
         </section>
       )}
 
-      <section aria-labelledby="history-heading" className="grid gap-3">
-        <h2 id="history-heading" className="text-lg font-semibold">
-          Status history
-        </h2>
-        <ol className="grid gap-2" aria-label="Status changes, newest first">
-          {history.map((event) => (
-            <li key={event.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-b pb-2 last:border-b-0">
-              <span>
-                {event.from_status === null
-                  ? `Created as ${STATUS_META[event.to_status].label}`
-                  : `${STATUS_META[event.from_status].label} → ${STATUS_META[event.to_status].label}`}
-              </span>
-              <time dateTime={event.changed_at} className="text-sm text-muted-foreground">
-                {formatDateTime(event.changed_at, timeZone)}
-              </time>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <InterviewsSection applicationId={app.id} interviews={interviews} contacts={contacts} timeZone={timeZone} />
+      <ContactsSection applicationId={app.id} contacts={contacts} />
+      <NotesSection applicationId={app.id} notes={notes} timeZone={timeZone} />
+      <HistorySection history={history} timeZone={timeZone} />
     </article>
   );
 }
