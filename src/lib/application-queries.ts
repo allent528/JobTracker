@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import type { Application } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
+import { type DateOnly, startOfDayInstant } from "@/lib/dates";
 import type { Contact, Interview, Note } from "@/lib/detail";
 import { selectUpcomingInterviews, toUpcomingInterviews, type UpcomingInterview } from "@/lib/interview-query";
 import type { PipelineItem } from "@/lib/pipeline";
@@ -11,15 +12,9 @@ import { selectPipeline, toPipelineItems } from "@/lib/pipeline-query";
 import { getTimeZone, getToday } from "@/lib/profile";
 import { applicationIdSchema } from "@/lib/schemas/application";
 import type { Status } from "@/lib/status";
+import { storedInterviewKind, storedInterviewOutcome, storedStatus, storedWorkMode } from "@/lib/stored";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
-
-// Narrowing casts here, in pipeline-query.ts and in interview-query.ts are the only places stored text becomes
-// `Status` / `WorkMode` / `InterviewKind` / `InterviewOutcome`. They're safe because the
-// applications_status_check, applications_work_mode_check, interviews_kind_check and
-// interviews_outcome_check constraints only allow those values, and check-constraints.test.ts
-// keeps the constraints equal to the TS constants. status_events copies a checked status in its trigger, so renaming or removing a
-// status must migrate status_events rows in the same migration (database.md).
 
 export type StatusEvent = Pick<Tables<"status_events">, "id" | "changed_at"> & {
   from_status: Status | null;
@@ -41,7 +36,7 @@ export async function getApplicationOrNotFound(id: string): Promise<Application>
     .maybeSingle();
   if (error) throw new Error("Couldn't load the application.");
   if (!data) notFound();
-  return data as Application;
+  return { ...data, status: storedStatus(data.status), work_mode: storedWorkMode(data.work_mode) };
 }
 
 /** Newest first. */
@@ -55,7 +50,11 @@ export async function getStatusHistory(applicationId: string): Promise<StatusEve
     .eq("user_id", user.id)
     .order("changed_at", { ascending: false });
   if (error) throw new Error("Couldn't load the status history.");
-  return data as StatusEvent[];
+  return data.map((event) => ({
+    ...event,
+    from_status: event.from_status === null ? null : storedStatus(event.from_status),
+    to_status: storedStatus(event.to_status),
+  }));
 }
 
 export async function listPipeline(): Promise<PipelineItem[]> {
@@ -66,7 +65,7 @@ export async function listPipeline(): Promise<PipelineItem[]> {
   return toPipelineItems(data, timeZone, today);
 }
 
-/** F5: newest first. */
+/** Newest first. */
 export async function listNotes(applicationId: string): Promise<Note[]> {
   const user = await getCurrentUser();
   const supabase = await createClient();
@@ -80,7 +79,7 @@ export async function listNotes(applicationId: string): Promise<Note[]> {
   return data;
 }
 
-/** F6: in the order they were added. */
+/** In the order they were added. */
 export async function listContacts(applicationId: string): Promise<Contact[]> {
   const user = await getCurrentUser();
   const supabase = await createClient();
@@ -94,7 +93,7 @@ export async function listContacts(applicationId: string): Promise<Contact[]> {
   return data;
 }
 
-/** F7: in schedule order, each with the ids of the contacts picked as interviewers. */
+/** In schedule order. */
 export async function listInterviews(applicationId: string): Promise<Interview[]> {
   const user = await getCurrentUser();
   const supabase = await createClient();
@@ -107,21 +106,22 @@ export async function listInterviews(applicationId: string): Promise<Interview[]
     .eq("user_id", user.id)
     .order("scheduled_at");
   if (error) throw new Error("Couldn't load the interviews.");
-  // kind / outcome narrowing: see the comment at the top of this file.
-  return data.map(({ interview_contacts, ...row }) => ({
-    ...(row as Omit<Interview, "contact_ids">),
+  return data.map(({ interview_contacts, kind, outcome, ...row }) => ({
+    ...row,
+    kind: storedInterviewKind(kind),
+    outcome: storedInterviewOutcome(outcome),
     contact_ids: interview_contacts.map((link) => link.contact_id),
   }));
 }
 
-/**
- * Pending interviews scheduled in [from, until) (ISO instants), soonest first, on applications
- * that aren't archived. For the reminders home page (F8).
- */
-export async function listUpcomingInterviews(range: { from: string; until: string }): Promise<UpcomingInterview[]> {
-  const user = await getCurrentUser();
+/** Days `from` up to (not including) `until`, in the owner's time zone. */
+export async function listUpcomingInterviews(range: { from: DateOnly; until: DateOnly }): Promise<UpcomingInterview[]> {
+  const [user, timeZone] = await Promise.all([getCurrentUser(), getTimeZone()]);
   const supabase = await createClient();
-  const { data, error } = await selectUpcomingInterviews(supabase, user.id, range);
+  const { data, error } = await selectUpcomingInterviews(supabase, user.id, {
+    from: startOfDayInstant(range.from, timeZone).toISOString(),
+    until: startOfDayInstant(range.until, timeZone).toISOString(),
+  });
   if (error) throw new Error("Couldn't load your interviews.");
   return toUpcomingInterviews(data);
 }

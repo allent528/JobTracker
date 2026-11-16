@@ -1,8 +1,6 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -12,7 +10,7 @@ import { TEXT_LIMITS } from "@/lib/limits";
 import { type ContactFormValues, contactSchema, EMPTY_CONTACT_FORM } from "@/lib/schemas/contact";
 
 import { createContact, deleteContact, updateContact } from "./actions";
-import { ConfirmDeleteButton, FormButtons, TextAreaField, TextField, useSectionAction } from "./section-ui";
+import { EditableRow, FormButtons, TextAreaField, TextField, useSectionForm } from "./section-ui";
 
 const LIMITS = TEXT_LIMITS.contacts;
 
@@ -23,7 +21,6 @@ function ContactForm({
   action,
   success,
   onDone,
-  onCancel,
 }: {
   legend: string;
   submitLabel: string;
@@ -31,22 +28,13 @@ function ContactForm({
   action: (values: ContactFormValues) => Promise<ActionResult>;
   success: string;
   onDone: () => void;
-  onCancel: () => void;
 }) {
-  const { pending, run } = useSectionAction();
-  const form = useForm<ContactFormValues>({
-    resolver: zodResolver(contactSchema, undefined, { raw: true }),
-    defaultValues,
-  });
+  const { form, pending, onSubmit } = useSectionForm(contactSchema, { defaultValues, action, success, onDone });
   const control = form.control;
 
   return (
     <Form {...form}>
-      <form
-        noValidate
-        className="grid gap-4 rounded-lg border p-4"
-        onSubmit={form.handleSubmit((values) => run(() => action(values), success, onDone))}
-      >
+      <form noValidate className="grid gap-4 rounded-lg border p-4" onSubmit={onSubmit}>
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-2 font-semibold">{legend}</legend>
           <TextField control={control} name="name" label="Name" maxLength={LIMITS.name} required />
@@ -71,7 +59,7 @@ function ContactForm({
             className="sm:col-span-2"
           />
         </fieldset>
-        <FormButtons pending={pending} submitLabel={submitLabel} onCancel={onCancel} />
+        <FormButtons pending={pending} submitLabel={submitLabel} onCancel={onDone} />
       </form>
     </Form>
   );
@@ -94,51 +82,33 @@ export function AddContact({ applicationId }: { applicationId: string }) {
       action={(values) => createContact(applicationId, values)}
       success="Contact added."
       onDone={() => setOpen(false)}
-      onCancel={() => setOpen(false)}
     />
   );
 }
 
-/** Keyed on updated_at by the caller, so a saved edit remounts it showing the new values. */
-export function ContactItem({ contact, children }: { contact: Contact; children: React.ReactNode }) {
-  const [editing, setEditing] = useState(false);
-
-  if (editing) {
-    return (
-      <ContactForm
-        legend={`Edit ${contact.name}`}
-        submitLabel="Save contact"
-        defaultValues={contactFormValues(contact)}
-        action={(values) => updateContact(contact.id, values)}
-        success="Contact saved."
-        onDone={() => setEditing(false)}
-        onCancel={() => setEditing(false)}
-      />
-    );
-  }
-
+export function ContactItem({ row, label, children }: { row: Contact; label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-3 rounded-lg border p-4">
-      {children}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`Edit contact ${contact.name}`}
-          onClick={() => setEditing(true)}
-        >
-          Edit
-        </Button>
-        <ConfirmDeleteButton
-          label={`Delete contact ${contact.name}`}
-          title="Delete this contact?"
-          description={`${contact.name} will be deleted and removed from any interviews they're listed on. This can't be undone.`}
-          confirmLabel="Delete contact"
-          success="Contact deleted."
-          action={() => deleteContact(contact.id)}
+    <EditableRow
+      label={label}
+      remove={{
+        title: "Delete this contact?",
+        description: `${row.name} will be deleted and removed from any interviews they're listed on. This can't be undone.`,
+        confirmLabel: "Delete contact",
+        success: "Contact deleted.",
+        action: () => deleteContact(row.id),
+      }}
+      editForm={(close) => (
+        <ContactForm
+          legend={`Edit ${row.name}`}
+          submitLabel="Save contact"
+          defaultValues={contactFormValues(row)}
+          action={(values) => updateContact(row.id, values)}
+          success="Contact saved."
+          onDone={close}
         />
-      </div>
-    </div>
+      )}
+    >
+      {children}
+    </EditableRow>
   );
 }

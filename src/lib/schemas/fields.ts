@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-// Field builders shared by the feature schemas. Each mirrors a database check (non-blank text,
-// `<table>_<col>_length`, `^https?://` links) so the form rejects what the database would.
+// Each builder mirrors a database check: non-blank text, `<table>_<col>_length`, `^https?://` links.
 
 const HTTP_URL = /^https?:\/\//i;
 
@@ -38,7 +37,6 @@ export function optionalHttpUrl(max: number) {
     .transform((value) => value || null);
 }
 
-/** Also decides whether free text (interviews.location) renders as a link (ui.md). */
 export function isHttpUrl(value: string): boolean {
   return HTTP_URL.test(value) && URL.canParse(value);
 }

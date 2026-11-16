@@ -111,7 +111,7 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
         </section>
       )}
 
-      <InterviewsSection applicationId={app.id} interviews={interviews} contacts={contacts} timeZone={timeZone} />
+      <InterviewsSection applicationId={app.id} status={app.status} interviews={interviews} contacts={contacts} timeZone={timeZone} />
       <ContactsSection applicationId={app.id} contacts={contacts} />
       <NotesSection applicationId={app.id} notes={notes} timeZone={timeZone} />
       <HistorySection history={history} timeZone={timeZone} />

@@ -66,7 +66,6 @@ test.describe("at phone width", () => {
     await expect(page.getByText("No contacts yet.")).toBeVisible();
     await expect(page.getByText("No interviews yet.")).toBeVisible();
 
-    // Notes (F5): newest first, edit, delete.
     await page.getByRole("button", { name: "Add note" }).click();
     await expect(page.getByText("Enter the note.")).toBeVisible();
     await field(page, "New note").fill("Phone screen went well.\n\n- ask about **on-call**");
@@ -96,7 +95,6 @@ test.describe("at phone width", () => {
     await expect(items(page, "Notes, newest first")).toHaveCount(1);
     await expect(page.getByText("Sent a thank-you email.")).toHaveCount(0);
 
-    // Contacts (F6): every field, edit, delete.
     await page.getByRole("button", { name: "Add contact" }).click();
     await field(page, "Email").fill("not-an-email");
     await page.getByRole("button", { name: "Add contact" }).click();
@@ -131,7 +129,6 @@ test.describe("at phone width", () => {
     await page.getByRole("button", { name: "Add contact" }).click();
     await expect(items(page, "Contacts")).toHaveCount(2);
 
-    // Interviews (F7): a picked contact plus free text, the Interviewing suggestion, edit, delete.
     await page.getByRole("button", { name: "Add interview" }).click();
     await page.getByRole("button", { name: "Add interview" }).click();
     await expect(page.getByText("Enter the date and time.")).toBeVisible();
@@ -171,29 +168,47 @@ test.describe("at phone width", () => {
     await expect(detailValue(round, "Location")).toHaveText("Room 4B");
     await expect(round.getByRole("link")).toHaveCount(0);
 
-    // Deleting a contact removes it from the interview's interviewers.
     await confirmDelete(page, "Delete contact John Roe", "Delete this contact?", "Delete contact");
     await expect(items(page, "Contacts")).toHaveCount(1);
     await expect(detailValue(round, "Interviewers")).toHaveText("Pat Example");
 
-    // A second interview doesn't suggest Interviewing again.
+    await round.getByRole("button", { name: /^Edit Technical interview/ }).click();
+    await page.getByRole("checkbox", { name: /Jane Doe/ }).check();
+    await confirmDelete(page, "Delete contact Jane Doe", "Delete this contact?", "Delete contact");
+    await expect(page.getByText("No contacts yet.")).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /Jane Doe/ })).toHaveCount(0);
+    await field(page, "Duration (minutes)").fill("60");
+    await page.getByRole("button", { name: "Save interview" }).click();
+    await expect(page.getByRole("button", { name: "Save interview" })).toHaveCount(0);
+    await expect(detailValue(round, "Duration")).toHaveText("1 hr");
+    await expect(detailValue(round, "Interviewers")).toHaveText("Pat Example");
+
+    await page.getByRole("button", { name: "Add contact" }).click();
+    await field(page, "Name").fill("Sam Poe");
+    await page.getByRole("button", { name: "Add contact" }).click();
+    await expect(items(page, "Contacts")).toHaveCount(1);
     await page.getByRole("button", { name: "Add interview" }).click();
     await field(page, "Type").selectOption("final");
     await field(page, "Date and time").fill("2026-12-08T14:30");
+    await page.getByRole("checkbox", { name: /Sam Poe/ }).check();
+    await confirmDelete(page, "Delete contact Sam Poe", "Delete this contact?", "Delete contact");
+    await expect(page.getByRole("checkbox", { name: /Sam Poe/ })).toHaveCount(0);
     await page.getByRole("button", { name: "Add interview" }).click();
     await expect(items(page, "Interviews, in schedule order")).toHaveCount(2);
-    await expect(items(page, "Interviews, in schedule order").nth(1)).toContainText("Final");
+    const final = items(page, "Interviews, in schedule order").nth(1);
+    await expect(final).toContainText("Final");
+    await expect(detailValue(final, "Interviewers")).toHaveCount(0);
     await expect(page.getByRole("status").filter({ hasText: "This is the first interview." })).toHaveCount(0);
 
     await confirmDelete(page, /^Delete Final interview on Dec 8, 2026/, "Delete this interview?", "Delete interview");
     await expect(items(page, "Interviews, in schedule order")).toHaveCount(1);
     await expectNoHorizontalScroll(page);
 
-    // Everything survives a reload (it came from the server, not client state).
     await page.reload();
     await expect(items(page, "Notes, newest first")).toHaveCount(1);
-    await expect(items(page, "Contacts")).toHaveCount(1);
+    await expect(page.getByText("No contacts yet.")).toBeVisible();
     await expect(items(page, "Interviews, in schedule order")).toHaveCount(1);
+    await expect(detailValue(round, "Interviewers")).toHaveText("Pat Example");
     await expectNoHorizontalScroll(page);
     expect(consoleErrors).toEqual([]);
   });

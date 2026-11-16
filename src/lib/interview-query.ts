@@ -2,9 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { type InterviewKind, PENDING_OUTCOME } from "@/lib/closed-sets";
 import type { Status } from "@/lib/status";
+import { storedInterviewKind, storedStatus } from "@/lib/stored";
 import type { Database } from "@/types/database.types";
 
-// Kept apart from application-queries.ts (server-only) so the local-stack suite can run the real query.
+// Outside application-queries.ts (server-only) so the local-stack suite can run the real query.
 
 export type UpcomingInterview = {
   id: string;
@@ -15,10 +16,7 @@ export type UpcomingInterview = {
   application: { id: string; company: string; role_title: string; status: Status };
 };
 
-/**
- * Pending interviews of `userId` scheduled in [from, until), soonest first, on applications that
- * aren't archived (F7, for F8's due lists). Bounds are ISO instants.
- */
+/** Pending rounds in [from, until) (ISO instants) on unarchived applications, soonest first. */
 export function selectUpcomingInterviews(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -39,16 +37,15 @@ export function selectUpcomingInterviews(
 
 type UpcomingRow = NonNullable<Awaited<ReturnType<typeof selectUpcomingInterviews>>["data"]>[number];
 
-// The casts are the narrowing described in application-queries.ts (check constraints keep them safe).
 export function toUpcomingInterviews(rows: UpcomingRow[]): UpcomingInterview[] {
   return rows.map(({ applications, kind, ...row }) => ({
     ...row,
-    kind: kind as InterviewKind,
+    kind: storedInterviewKind(kind),
     application: {
       id: applications.id,
       company: applications.company,
       role_title: applications.role_title,
-      status: applications.status as Status,
+      status: storedStatus(applications.status),
     },
   }));
 }

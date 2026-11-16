@@ -15,7 +15,6 @@ const email = z
   })
   .transform((value) => value || null);
 
-/** F6. Inputs are strings; blanks become nulls. */
 export const contactSchema = z.object({
   name: requiredText("name", LIMITS.name),
   title: optionalText(LIMITS.title),

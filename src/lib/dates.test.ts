@@ -8,6 +8,7 @@ import {
   formatDateTimeWithZone,
   instantToLocalDateTime,
   localDateTimeToInstant,
+  startOfDayInstant,
 } from "./dates";
 
 describe("formatDate", () => {
@@ -93,5 +94,19 @@ describe("formatDateTimeWithZone", () => {
     expect(formatDateTimeWithZone("2026-12-01T15:00:00Z", "America/New_York")).toBe("Dec 1, 2026, 10:00 AM EST");
     expect(formatDateTimeWithZone("2026-07-01T14:00:00Z", "America/New_York")).toBe("Jul 1, 2026, 10:00 AM EDT");
     expect(formatDateTimeWithZone("2026-12-01T15:00:00Z", "UTC")).toBe("Dec 1, 2026, 3:00 PM UTC");
+  });
+});
+
+describe("startOfDayInstant", () => {
+  it("is midnight in the zone", () => {
+    expect(startOfDayInstant("2026-12-01", "America/New_York").toISOString()).toBe("2026-12-01T05:00:00.000Z");
+    expect(startOfDayInstant("2026-12-01", "UTC").toISOString()).toBe("2026-12-01T00:00:00.000Z");
+    expect(startOfDayInstant("2026-12-01", "Asia/Tokyo").toISOString()).toBe("2026-11-30T15:00:00.000Z");
+  });
+
+  it("round-trips years 1900 to 2999", () => {
+    for (const local of ["1900-01-01T00:00", "1969-12-31T23:59", "2999-12-31T23:59"]) {
+      expect(instantToLocalDateTime(localDateTimeToInstant(local, "America/New_York"), "America/New_York")).toBe(local);
+    }
   });
 });

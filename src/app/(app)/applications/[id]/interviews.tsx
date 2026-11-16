@@ -1,21 +1,11 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
-import { type Control, useForm } from "react-hook-form";
+import type { Control } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Form, FormDescription, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action-result";
 import {
   INTERVIEW_KIND_LABELS,
@@ -31,11 +21,11 @@ import {
   type InterviewFormValues,
   interviewSchema,
 } from "@/lib/schemas/interview";
-import { INTERVIEWING_STATUS, STATUS_META } from "@/lib/status";
+import { INTERVIEWING_STATUS, type Status, STATUS_META, suggestsInterviewing } from "@/lib/status";
 
 import { useChangeStatus } from "../use-change-status";
 import { createInterview, deleteInterview, updateInterview } from "./actions";
-import { ConfirmDeleteButton, FormButtons, TextAreaField, TextField, useSectionAction } from "./section-ui";
+import { EditableRow, FormButtons, SelectField, TextAreaField, TextField, useSectionForm } from "./section-ui";
 
 const LIMITS = TEXT_LIMITS.interviews;
 
@@ -62,59 +52,28 @@ function InterviewForm<T>({
   onDone: (data: T) => void;
   onCancel: () => void;
 }) {
-  const { pending, run } = useSectionAction();
-  const form = useForm<InterviewFormValues>({
-    resolver: zodResolver(interviewSchema, undefined, { raw: true }),
+  const { form, pending, onSubmit } = useSectionForm(interviewSchema, {
     defaultValues,
+    // A contact deleted while this form was open is still in its picked ids.
+    action: (values) =>
+      action({ ...values, contact_ids: values.contact_ids.filter((id) => contacts.some((c) => c.id === id)) }),
+    success,
+    onDone,
   });
   const control = form.control;
 
   return (
     <Form {...form}>
-      <form
-        noValidate
-        className="grid gap-4 rounded-lg border p-4"
-        onSubmit={form.handleSubmit((values) => run(() => action(values), success, onDone))}
-      >
+      <form noValidate className="grid gap-4 rounded-lg border p-4" onSubmit={onSubmit}>
         <fieldset className="grid gap-4 sm:grid-cols-2">
           <legend className="mb-2 font-semibold">{legend}</legend>
-          <FormField
-            control={control}
-            name="kind"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type</FormLabel>
-                <FormControl>
-                  <NativeSelect {...field} className="w-full">
-                    {INTERVIEW_KINDS.map((kind) => (
-                      <NativeSelectOption key={kind} value={kind}>
-                        {INTERVIEW_KIND_LABELS[kind]}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
+          <SelectField control={control} name="kind" label="Type" options={INTERVIEW_KINDS} labels={INTERVIEW_KIND_LABELS} />
+          <SelectField
             control={control}
             name="outcome"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Outcome</FormLabel>
-                <FormControl>
-                  <NativeSelect {...field} className="w-full">
-                    {INTERVIEW_OUTCOMES.map((outcome) => (
-                      <NativeSelectOption key={outcome} value={outcome}>
-                        {INTERVIEW_OUTCOME_LABELS[outcome]}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Outcome"
+            options={INTERVIEW_OUTCOMES}
+            labels={INTERVIEW_OUTCOME_LABELS}
           />
           <TextField
             control={control}
@@ -175,28 +134,25 @@ function InterviewerPicker({ control, contacts }: { control: Control<InterviewFo
               <FormDescription>Add contacts to this application to pick them here.</FormDescription>
             ) : (
               <ul className="grid gap-2">
-                {contacts.map((contact) => {
-                  const checked = field.value.includes(contact.id);
-                  return (
-                    <li key={contact.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`interviewer-${contact.id}`}
-                        checked={checked}
-                        onCheckedChange={(next) =>
-                          field.onChange(
-                            next === true
-                              ? [...field.value, contact.id]
-                              : field.value.filter((id) => id !== contact.id),
-                          )
-                        }
-                      />
-                      <label htmlFor={`interviewer-${contact.id}`} className="text-sm break-words">
-                        {contact.name}
-                        {contact.title && <span className="text-muted-foreground"> · {contact.title}</span>}
-                      </label>
-                    </li>
-                  );
-                })}
+                {contacts.map((contact) => (
+                  <li key={contact.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`interviewer-${contact.id}`}
+                      checked={field.value.includes(contact.id)}
+                      onCheckedChange={(next) =>
+                        field.onChange(
+                          next === true
+                            ? [...field.value, contact.id]
+                            : field.value.filter((id) => id !== contact.id),
+                        )
+                      }
+                    />
+                    <label htmlFor={`interviewer-${contact.id}`} className="text-sm break-words">
+                      {contact.name}
+                      {contact.title && <span className="text-muted-foreground"> · {contact.title}</span>}
+                    </label>
+                  </li>
+                ))}
               </ul>
             )}
           </fieldset>
@@ -209,22 +165,26 @@ function InterviewerPicker({ control, contacts }: { control: Control<InterviewFo
 
 export function AddInterview({
   applicationId,
+  status,
   contacts,
   timeZone,
 }: {
   applicationId: string;
+  status: Status;
   contacts: PickerContact[];
   timeZone: string;
 }) {
   const [open, setOpen] = useState(false);
   const [suggest, setSuggest] = useState(false);
   const { pending, change } = useChangeStatus();
+  const interviewing = STATUS_META[INTERVIEWING_STATUS].label;
 
   return (
     <div className="grid gap-3">
-      {suggest && (
+      {/* Re-checked against the current status, so a stale banner can't move the application back. */}
+      {suggest && suggestsInterviewing(status, 1) && (
         <div role="status" className="grid gap-3 rounded-lg border bg-muted p-4">
-          <p>This is the first interview. Move the application to {STATUS_META[INTERVIEWING_STATUS].label}?</p>
+          <p>This is the first interview. Move the application to {interviewing}?</p>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -234,7 +194,7 @@ export function AddInterview({
                 setSuggest(false);
               }}
             >
-              Move to {STATUS_META[INTERVIEWING_STATUS].label}
+              Move to {interviewing}
             </Button>
             <Button type="button" variant="outline" onClick={() => setSuggest(false)}>
               Not now
@@ -266,55 +226,44 @@ export function AddInterview({
   );
 }
 
-/** Keyed on updated_at by the caller, so a saved edit remounts it showing the new values. */
 export function InterviewItem({
-  interview,
+  row,
   label,
   contacts,
   timeZone,
   children,
 }: {
-  interview: Interview;
-  /** e.g. "Technical interview on Dec 1, 2026, 10:00 AM EST", for the buttons' names. */
+  row: Interview;
   label: string;
   contacts: PickerContact[];
   timeZone: string;
   children: React.ReactNode;
 }) {
-  const [editing, setEditing] = useState(false);
-
-  if (editing) {
-    return (
-      <InterviewForm
-        legend={`Edit ${label}`}
-        submitLabel="Save interview"
-        defaultValues={interviewFormValues(interview, timeZone)}
-        contacts={contacts}
-        timeZone={timeZone}
-        action={(values) => updateInterview(interview.id, values)}
-        success="Interview saved."
-        onDone={() => setEditing(false)}
-        onCancel={() => setEditing(false)}
-      />
-    );
-  }
-
   return (
-    <div className="grid gap-3 rounded-lg border p-4">
-      {children}
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" size="sm" aria-label={`Edit ${label}`} onClick={() => setEditing(true)}>
-          Edit
-        </Button>
-        <ConfirmDeleteButton
-          label={`Delete ${label}`}
-          title="Delete this interview?"
-          description={`The ${label} will be deleted. This can't be undone.`}
-          confirmLabel="Delete interview"
-          success="Interview deleted."
-          action={() => deleteInterview(interview.id)}
+    <EditableRow
+      label={label}
+      remove={{
+        title: "Delete this interview?",
+        description: `The ${label} will be deleted. This can't be undone.`,
+        confirmLabel: "Delete interview",
+        success: "Interview deleted.",
+        action: () => deleteInterview(row.id),
+      }}
+      editForm={(close) => (
+        <InterviewForm
+          legend={`Edit ${label}`}
+          submitLabel="Save interview"
+          defaultValues={interviewFormValues(row, timeZone)}
+          contacts={contacts}
+          timeZone={timeZone}
+          action={(values) => updateInterview(row.id, values)}
+          success="Interview saved."
+          onDone={close}
+          onCancel={close}
         />
-      </div>
-    </div>
+      )}
+    >
+      {children}
+    </EditableRow>
   );
 }

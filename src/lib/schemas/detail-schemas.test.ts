@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { TEXT_LIMITS } from "@/lib/limits";
 
 import { type ContactFormValues, contactSchema, EMPTY_CONTACT_FORM } from "./contact";
-import { EMPTY_INTERVIEW_FORM, type InterviewFormValues, interviewSchema } from "./interview";
+import { EMPTY_INTERVIEW_FORM, type InterviewFormValues, interviewSchema, MAX_PICKED_INTERVIEWERS } from "./interview";
 import { noteSchema } from "./note";
 
 const CONTACT_ID = "6f1c1e8e-3b2a-4c47-9d55-0e7f3f1b2a10";
@@ -108,6 +108,23 @@ describe("interviewSchema", () => {
     for (const scheduled_at of ["", "2026-12-01", "2026-02-30T10:00", "2026-12-01T24:00", "2026-12-01 10:00"]) {
       expect(firstError(parse({ scheduled_at }), "scheduled_at")).toBe("Enter the date and time.");
     }
+  });
+
+  it("accepts years 1900 to 2999 only", () => {
+    for (const scheduled_at of ["1900-01-01T00:00", "2999-12-31T23:59"]) {
+      expect(parse({ scheduled_at }).success).toBe(true);
+    }
+    for (const scheduled_at of ["0026-12-01T10:00", "0999-12-01T10:00", "1899-12-31T23:59", "3000-01-01T00:00"]) {
+      expect(firstError(parse({ scheduled_at }), "scheduled_at")).toBe("Enter the date and time.");
+    }
+  });
+
+  it("caps the picked interviewers", () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `6f1c1e8e-3b2a-4c47-9d55-${String(i).padStart(12, "0")}`);
+    expect(parse({ contact_ids: ids(MAX_PICKED_INTERVIEWERS) }).success).toBe(true);
+    expect(firstError(parse({ contact_ids: ids(MAX_PICKED_INTERVIEWERS + 1) }), "contact_ids")).toBe(
+      `Pick up to ${MAX_PICKED_INTERVIEWERS} interviewers.`,
+    );
   });
 
   it("mirrors interviews_duration_minutes_range", () => {

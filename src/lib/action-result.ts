@@ -8,7 +8,7 @@ export const UNREACHABLE_ERROR = "Couldn't reach the server. Try again.";
 
 const INVALID_INPUT = "Check the form and try again.";
 
-/** Server Actions parse untrusted input with the form's schema; the first issue becomes the error. */
+/** The first issue becomes the error. */
 export function parseOr<S extends z.ZodType>(schema: S, input: unknown): ActionResult<z.output<S>> {
   const parsed = schema.safeParse(input);
   return parsed.success
