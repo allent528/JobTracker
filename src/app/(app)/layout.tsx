@@ -10,7 +10,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <>
       <header className="border-b">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
           <Link href="/" className="font-semibold tracking-tight">
             JobTracker
           </Link>
@@ -19,7 +19,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
     </>
   );
 }

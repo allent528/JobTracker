@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { OTP_LENGTH } from "../../../src/lib/schemas/auth";
+import type { Database, TablesInsert } from "../../../src/types/database.types";
 
 /** Fake test users (D4). Each spec uses its own address so parallel tests don't share an inbox. */
 export const TEST_USERS = {
@@ -10,6 +11,11 @@ export const TEST_USERS = {
   appliedOnCreate: "e2e-applied-on-create@example.com",
   isolationOwner: "e2e-isolation-owner@example.com",
   isolationOther: "e2e-isolation-other@example.com",
+  pipelineTable: "e2e-pipeline-table@example.com",
+  pipelineBoard: "e2e-pipeline-board@example.com",
+  pipelineDrag: "e2e-pipeline-drag@example.com",
+  pipelinePhone: "e2e-pipeline-phone@example.com",
+  pipelineRollback: "e2e-pipeline-rollback@example.com",
 } as const;
 
 /** Must never have an account; global setup deletes it if a past run left one. */
@@ -32,7 +38,7 @@ export function localSupabaseUrl(): string {
 export function adminClient() {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!key) throw new Error("SUPABASE_SECRET_KEY is not set in .env.local (local stack key, tests only).");
-  return createClient(localSupabaseUrl(), key, {
+  return createClient<Database>(localSupabaseUrl(), key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
@@ -41,6 +47,19 @@ export async function findUserByEmail(email: string) {
   const { data, error } = await adminClient().auth.admin.listUsers({ perPage: 1000 });
   if (error) throw error;
   return data.users.find((user) => user.email === email) ?? null;
+}
+
+export async function seedApplications(
+  email: string,
+  rows: Omit<TablesInsert<"applications">, "user_id">[],
+): Promise<void> {
+  const user = await findUserByEmail(email);
+  if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
+  const { error } = await adminClient()
+    .from("applications")
+    // defaultToNull: false lets rows leave out columns (PostgREST otherwise nulls them in a bulk insert).
+    .insert(rows.map((row) => ({ ...row, user_id: user.id })), { defaultToNull: false });
+  if (error) throw error;
 }
 
 type MailpitMessage = { ID: string; Text: string; HTML: string };

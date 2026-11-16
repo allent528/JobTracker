@@ -37,7 +37,7 @@ test.describe("at phone width", () => {
   test("create, edit, change status, archive and delete an application", async ({ page, signInAs }) => {
     await signInAs(TEST_USERS.applications);
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
-    await expect(page.getByText("No active applications.")).toBeVisible();
+    await expect(page.getByText("No applications yet.")).toBeVisible();
 
     await page.getByRole("link", { name: "New application" }).click();
     await expect(page).toHaveURL("/applications/new");
@@ -110,7 +110,9 @@ test.describe("at phone width", () => {
     await expect(page.getByRole("button", { name: "Unarchive" })).toBeVisible();
     await page.getByRole("link", { name: "All applications" }).click();
     await expect(page.getByRole("link", { name: /Acme Corp/ })).toHaveCount(0);
-    await page.getByRole("link", { name: "Show archived" }).click();
+    await page.getByRole("link", { name: "Table" }).click();
+    await expect(page.getByRole("link", { name: /Acme Corp/ })).toHaveCount(0);
+    await page.getByRole("checkbox", { name: "Show archived" }).click();
     await page.getByRole("link", { name: /Acme Corp/ }).click();
     await expect(page).toHaveURL(detailUrl);
     await page.getByRole("button", { name: "Unarchive" }).click();
@@ -125,8 +127,7 @@ test.describe("at phone width", () => {
 
     await page.getByRole("button", { name: "Delete" }).click();
     await dialog.getByRole("button", { name: "Delete application" }).click();
-    await expect(page).toHaveURL("/");
-    await page.goto("/?archived=1");
+    await expect(page).toHaveURL("/applications");
     await expect(page.getByText("No applications yet.")).toBeVisible();
     await page.goto(detailUrl);
     await expect(page.getByText("This page could not be found.")).toBeVisible();
@@ -171,6 +172,13 @@ test("another user can't open someone else's application", async ({ browser, pag
       await other.goto(path);
       await expect(other.getByText("This page could not be found.")).toBeVisible();
       for (const text of ["Initech", "Platform Engineer", "Owner-only note"]) {
+        await expect(other.getByText(text)).toHaveCount(0);
+      }
+    }
+    for (const path of ["/applications", "/applications?view=table"]) {
+      await other.goto(path);
+      await expect(other.getByText("No applications yet.")).toBeVisible();
+      for (const text of ["Initech", "Platform Engineer"]) {
         await expect(other.getByText(text)).toHaveCount(0);
       }
     }

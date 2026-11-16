@@ -7,6 +7,8 @@ import {
   EMPTY_APPLICATION_FORM,
   formatSalaryRange,
   initialStatus,
+  parsePipelineView,
+  pipelineViewPath,
   toFormValues,
 } from "./applications";
 import { writeErrorMessage } from "./db-errors";
@@ -91,5 +93,16 @@ describe("writeErrorMessage", () => {
     expect(writeErrorMessage({ code: "23503" })).toMatch(/can't make that change/);
     expect(writeErrorMessage({ code: "XX000" })).toMatch(/couldn't save/);
     expect(writeErrorMessage(null)).toMatch(/couldn't save/);
+  });
+});
+
+describe("pipeline views", () => {
+  it("defaults to the board and round-trips the table view", () => {
+    expect(parsePipelineView(undefined)).toBe("board");
+    expect(parsePipelineView("bogus")).toBe("board");
+    expect(parsePipelineView(["table", "board"])).toBe("board");
+    expect(parsePipelineView("table")).toBe("table");
+    expect(pipelineViewPath("board")).toBe("/applications");
+    expect(pipelineViewPath("table")).toBe("/applications?view=table");
   });
 });

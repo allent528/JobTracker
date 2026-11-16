@@ -1,14 +1,12 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { INTERVIEW_KINDS, INTERVIEW_OUTCOMES, WORK_MODES } from "@/lib/closed-sets";
 import { TEXT_LIMITS } from "@/lib/limits";
 import { STATUSES } from "@/lib/status";
-import type { Database, TablesUpdate } from "@/types/database.types";
+import type { TablesUpdate } from "@/types/database.types";
 
-import { adminClient, findUserByEmail, localSupabaseUrl } from "../e2e/support/local-env";
-
-type Client = SupabaseClient<Database>;
+import { localSupabaseUrl } from "../e2e/support/local-env";
+import { type Client, newClient, publishableKey, recreateUser, rowOrThrow, signedInClient } from "./support";
 
 // Fake users for these checks only; recreated each run so every row below is fresh.
 const USER_A = "rls-a@example.com";
@@ -18,49 +16,6 @@ const USER_B = "rls-b@example.com";
 const DENIED = "42501"; // RLS violation or missing (column) privilege
 const FK_VIOLATION = "23503";
 const CHECK_VIOLATION = "23514";
-
-function publishableKey(): string {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!key) throw new Error("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is not set in .env.local.");
-  return key;
-}
-
-function newClient(): Client {
-  return createClient<Database>(localSupabaseUrl(), publishableKey(), {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-async function recreateUser(email: string): Promise<string> {
-  const admin = adminClient();
-  const existing = await findUserByEmail(email);
-  if (existing) {
-    const { error } = await admin.auth.admin.deleteUser(existing.id);
-    if (error) throw error;
-  }
-  const { data, error } = await admin.auth.admin.createUser({ email, email_confirm: true });
-  if (error) throw error;
-  return data.user.id;
-}
-
-/** Signs in through a magic-link token hash, as the app's /auth/confirm route does. */
-async function signedInClient(email: string): Promise<Client> {
-  const { data, error } = await adminClient().auth.admin.generateLink({ type: "magiclink", email });
-  if (error) throw error;
-  const client = newClient();
-  const { error: verifyError } = await client.auth.verifyOtp({
-    type: "email",
-    token_hash: data.properties.hashed_token,
-  });
-  if (verifyError) throw verifyError;
-  return client;
-}
-
-function rowOrThrow<T>(result: { data: T; error: unknown }): NonNullable<T> {
-  if (result.error) throw result.error;
-  if (result.data === null || result.data === undefined) throw new Error("expected a row");
-  return result.data;
-}
 
 type Fixture = { applicationId: string; noteId: string; contactId: string; interviewId: string; linkId: string };
 

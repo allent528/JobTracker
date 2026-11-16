@@ -35,4 +35,12 @@ paths:
 - `getByRole("alert")` also matches Next's empty `#__next-route-announcer__`; filter by text (`.filter({ hasText })`).
 - Signed-in specs use the `signInAs(email, page?)` fixture from `tests/e2e/support/fixtures.ts` (import `test`/`expect` from there): it deletes the user's applications, makes a magic-link token hash with the admin API and opens `/auth/confirm` with it. No email involved. Pass a page from `browser.newContext()` to sign in a second user. Add a user per test to `TEST_USERS`.
 - Hidden, still-mounted routes (docs/learnings.md) mean `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`.
+- `signInAs` ends on `/applications`, because `/` redirects there until step 7.
+- Seed fake rows with `seedApplications(email, rows)` from `local-env.ts` after signing in, since sign-in clears the user's applications. It inserts with `defaultToNull: false`, so rows can leave columns out.
+- To check for flakes, repeat serially: `--repeat-each=N --workers=1`. Parallel repeats run copies of a test as the same user, and each copy's `signInAs` deletes the others' rows.
+- Board drag and drop works in Playwright: `page.mouse` down, `move(..., { steps })`, up. Start on the card's padding, not its link or menu.
+- Radix menus can drop the first arrow key after a keyboard open. Press until the target item is focused (`expect(...).toPass()`), not a fixed number of times.
+- To test an optimistic update, hold the Server Action request with `page.route` (match a POST with a `next-action` header), check the UI, then let it continue. `route.abort()` simulates a network failure.
+- The local-stack suite shares sign-in helpers through `tests/rls/support.ts`. Give each file its own fake user, so files and parallel runs don't touch each other's rows.
+- Setup that no client role may do (such as backdating `status_events`) goes through `localSuperuserQuery(sql)` in `tests/rls/support.ts`. It runs the Supabase CLI's `db query`, which targets the local stack because the repo is never linked.
 - The magic link is built from `site_url` in `supabase/config.toml`, so it must match Playwright's `baseURL` (`http://localhost:3000`); cookies are per host.

@@ -80,3 +80,45 @@
 - **Root cause:** The tool layer turned the escape into the character. Writing this entry with a Bash heredoc did the same.
 - **Fix:** Rewrote the escape with a Node one-liner that builds the backslash with `String.fromCharCode(92)`, then checked the bytes with `od -c`.
 - **Lesson:** After writing an escape sequence, grep the file to check it's still an escape.
+
+## 2026-11-14: Multi-line `node -e` replacements silently did nothing
+- **Mistake:** Several `node -e` scripts using `s.replace(<multi-line template literal>, …)` reported success but left files unchanged; one with `"\n"` in the replacement didn't apply either.
+- **Root cause:** Probably the same tool-layer escaping as the 2026-11-14 heredoc entries above: the script Node ran wasn't byte-for-byte what was written, so the search string never matched. `String.prototype.replace` doesn't fail on no match.
+- **Fix:** Redid those edits with the Edit tool and checked them with `git diff`.
+- **Lesson:** Use the Edit tool for multi-line or escape-bearing changes; after any scripted edit, check `git diff` before moving on.
+
+## 2026-11-14: A page that only calls redirect() fails Cache Components validation
+- **Mistake:** `src/app/(app)/page.tsx` was just `redirect("/applications")`. Dev logged "Route "/": Could not validate `instant` because an error prevented the target segment from rendering". Moving it to `redirects()` in `next.config.ts` then broke code sign-in: the Server Action's `redirect("/")` stayed on `/`.
+- **Root cause:** Cache Components prerenders the page to validate it, and the redirect throws during that prerender. `next.config` redirects only apply to incoming HTTP requests; a Server Action redirect renders the target route in the same request, so it never sees them.
+- **Fix:** The page renders `<Suspense>` around an async component that awaits `connection()` and then calls `redirect()`, so it runs only at request time and works for both browser loads and Server Action redirects.
+- **Lesson:** Request-time redirects in pages go behind `connection()` inside Suspense. Don't use `next.config` redirects for paths that Server Actions redirect to.
+
+## 2026-11-14: sr-only text inside a horizontal scroller widened the page
+- **Mistake:** At 375px the board looked right but the page scrolled 957px sideways.
+- **Root cause:** Tailwind's `sr-only` is `position: absolute`. An absolutely positioned box is clipped by an overflow ancestor only if that ancestor (or something inside it) is its containing block. The board scroller wasn't positioned, so each column's sr-only count was positioned against the initial containing block, outside the scroller's clipping, and the page's scroll width grew to reach the last one.
+- **Fix:** The scroller is `relative`. Found by listing elements whose `getBoundingClientRect().right` passed the viewport (none was wider than it).
+- **Lesson:** Give any overflow container that holds absolutely positioned content (sr-only text, badges) `position: relative`. Recorded in `.claude/rules/ui.md`.
+
+## 2026-11-14: Bulk inserts through PostgREST null out missing columns
+- **Mistake:** An e2e seed inserted rows where only some set `updated_at`; the others failed with 23502 (null in a not-null column).
+- **Root cause:** For a multi-row insert, PostgREST uses the union of keys as the column list and sends null where a row leaves a key out, skipping column defaults.
+- **Fix:** `insert(rows, { defaultToNull: false })` in `seedApplications`, so missing keys get the column default.
+- **Lesson:** Pass `defaultToNull: false` to bulk inserts whose rows don't all have the same keys. Recorded in `.claude/rules/testing.md`.
+
+## 2026-11-14: Radix menus can drop the first arrow key after a keyboard open
+- **Mistake:** The e2e opened a card's Move menu with Enter and pressed ArrowDown twice expecting Screening; focus landed on Applied.
+- **Root cause:** Likely cause: right after a keyboard open, Radix moves focus to the first item asynchronously and an ArrowDown that arrives first is ignored. Not confirmed; it was timing-dependent.
+- **Fix:** The test presses ArrowDown inside `expect(...).toPass()` until the target item has focus.
+- **Lesson:** Drive Radix menus in e2e by "press until focused", not a fixed key count. Recorded in `.claude/rules/testing.md`.
+
+## 2026-11-15: `dateInTimeZone(new Date(), await getTimeZone())` read the clock too early
+- **Mistake:** The new `getToday()` made the browser console report "Route "/applications": Next.js encountered the unstable value `new Date()` while prerendering". The e2e suite still passed, and the dev server log was clean, so only a console listener caught it.
+- **Root cause:** JavaScript evaluates call arguments left to right, so `new Date()` ran before `await getTimeZone()` reached `connection()`. Reading the clock before request-bound data fails Cache Components prerendering.
+- **Fix:** `getToday()` awaits the time zone first, then calls `new Date()`.
+- **Lesson:** In server code, read the clock only after an awaited request-bound read, never in an argument list beside an `await`. After a UI change, check the browser console as well as the server log.
+
+## 2026-11-15: A rejected Server Action inside startTransition crashes to the error screen
+- **Mistake:** The board's move handled `{ ok: false }` results, but an aborted request (offline, server down) rejected the action's promise inside `startTransition`, which sent the page to the error boundary.
+- **Root cause:** Errors thrown inside a transition go to the nearest error boundary. Returning `ActionResult` covers only failures the server reports.
+- **Fix:** `useChangeStatus` wraps the call in try/catch and toasts `UNREACHABLE_ERROR`; the optimistic move rolls back when the transition ends. `src/app/(app)/error.tsx` is a safety net for anything else. An e2e aborts the action request with `page.route` and fails without the try/catch.
+- **Lesson:** Client calls to Server Actions inside a transition catch rejections. Recorded in `.claude/rules/ui.md`.

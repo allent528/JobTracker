@@ -29,3 +29,14 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 - Show action results with `toastResult(result, success?)` from `src/lib/toast-result.ts` (sonner; `<Toaster />` is in the root layout). Status changes go through `useChangeStatus()` in `src/app/(app)/applications/`, so the board reuses the same call and toast.
 - Next keeps recently visited routes mounted but hidden, so client state can outlive a navigation (see docs/learnings.md). Client state seeded from server data remounts on a `key` that changes with that data: the edit form keys on `updated_at`, and `StatusControl` keys its inner select on `status`.
 - Status changes on the detail page apply on an explicit button, not on the select's `change` event: arrowing through a closed native select fires `change` per option on Windows, which would log a status event each time.
+- The pipeline lives at `/applications` (`page.tsx`, `pipeline-board.tsx`, `pipeline-table.tsx`). `?view=table` switches views. Ordering, filtering and sorting stay in `src/lib/pipeline.ts`, not in components.
+- `/` is a request-time redirect placeholder until step 7.
+- The signed-in shell is `max-w-7xl`. Pages that read better narrower cap themselves: the detail page at `max-w-5xl`, the forms at `max-w-3xl`.
+- The board uses `MouseSensor` (8px) and `TouchSensor` (250ms long press), so a swipe still scrolls. It has no `KeyboardSensor` and spreads no draggable `attributes`.
+- The keyboard path on the board is each card's Move menu, a Radix radio menu.
+- Links inside a draggable card get `draggable={false}`. Otherwise the browser's native link drag takes over.
+- Board moves call `useChangeStatus(setOptimistic)`, so the `useOptimistic` setter runs inside the action's transition.
+- Client code that awaits a Server Action inside a transition catches rejections and toasts `UNREACHABLE_ERROR`. An uncaught rejection goes to `src/app/(app)/error.tsx`.
+- Follow-up dates show `<FollowUpBadge state={followUpState(date, today)} />` from `src/components/follow-up-badge.tsx`.
+- An `overflow-x-auto` container that holds absolutely positioned content (including `sr-only` text) needs `relative`. Otherwise that content widens the page past 375px.
+- A page that only redirects must do it at request time: `connection()`, then `redirect()`, inside `<Suspense>`. See docs/learnings.md.

@@ -17,3 +17,25 @@ export function formatDateTime(timestamp: string, timeZone: string): string {
     new Date(timestamp),
   );
 }
+
+/** A calendar date as `YYYY-MM-DD`; compares correctly as a string. */
+export type DateOnly = string;
+
+export function dateInTimeZone(instant: Date | string, timeZone: string): DateOnly {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(instant));
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function daysBetween(from: DateOnly, to: DateOnly): number {
+  const utc = (date: string) => {
+    const [year, month, day] = date.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
