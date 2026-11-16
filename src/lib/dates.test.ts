@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addDays,
   dateInTimeZone,
   daysBetween,
   formatDate,
@@ -108,5 +109,21 @@ describe("startOfDayInstant", () => {
     for (const local of ["1900-01-01T00:00", "1969-12-31T23:59", "2999-12-31T23:59"]) {
       expect(instantToLocalDateTime(localDateTimeToInstant(local, "America/New_York"), "America/New_York")).toBe(local);
     }
+  });
+});
+
+describe("addDays", () => {
+  it("adds calendar days across month, year and leap-day boundaries", () => {
+    expect(addDays("2026-11-15", 7)).toBe("2026-11-22");
+    expect(addDays("2026-11-28", 7)).toBe("2026-12-05");
+    expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
+    expect(addDays("2026-02-28", 1)).toBe("2026-03-01");
+    expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
+  });
+
+  it("is unaffected by DST changes (date-only arithmetic)", () => {
+    expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
+    expect(addDays("2026-03-07", 2)).toBe("2026-03-09");
   });
 });

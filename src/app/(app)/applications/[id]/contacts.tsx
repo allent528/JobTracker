@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { EditableRow, FormButtons, TextAreaField, TextField, useSectionForm } from "@/components/section-ui";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action-result";
@@ -10,7 +11,6 @@ import { TEXT_LIMITS } from "@/lib/limits";
 import { type ContactFormValues, contactSchema, EMPTY_CONTACT_FORM } from "@/lib/schemas/contact";
 
 import { createContact, deleteContact, updateContact } from "./actions";
-import { EditableRow, FormButtons, TextAreaField, TextField, useSectionForm } from "./section-ui";
 
 const LIMITS = TEXT_LIMITS.contacts;
 

@@ -115,3 +115,22 @@ export async function deleteOwnChild({
     .maybeSingle();
   return ownedRowResult(result, table);
 }
+
+export const PROFILE_NOT_FOUND = "We couldn't find your settings. Sign out and in again.";
+
+/**
+ * Sets the owner's `profiles.time_zone` (the only column clients may update there). With
+ * `onlyIfUnset`, an already-saved zone is left alone and `changed` is false.
+ */
+export async function updateOwnTimeZone(
+  userId: string,
+  timeZone: string,
+  { onlyIfUnset = false } = {},
+): Promise<ActionResult<{ changed: boolean }>> {
+  const supabase = await createClient();
+  const update = supabase.from("profiles").update({ time_zone: timeZone }).eq("id", userId);
+  const { data, error } = await (onlyIfUnset ? update.is("time_zone", null) : update).select("id").maybeSingle();
+  if (error) return { ok: false, error: writeErrorMessage(error) };
+  if (data === null && !onlyIfUnset) return { ok: false, error: PROFILE_NOT_FOUND };
+  return { ok: true, data: { changed: data !== null } };
+}

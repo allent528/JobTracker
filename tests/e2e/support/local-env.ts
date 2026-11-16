@@ -19,6 +19,11 @@ export const TEST_USERS = {
   detailSections: "e2e-detail-sections@example.com",
   detailIsolationOwner: "e2e-detail-isolation-owner@example.com",
   detailIsolationOther: "e2e-detail-isolation-other@example.com",
+  homeBuckets: "e2e-home-buckets@example.com",
+  homeFollowUp: "e2e-home-follow-up@example.com",
+  homeTimeZone: "e2e-home-time-zone@example.com",
+  homeIsolationOwner: "e2e-home-isolation-owner@example.com",
+  homeIsolationOther: "e2e-home-isolation-other@example.com",
 } as const;
 
 /** Must never have an account; global setup deletes it if a past run left one. */
@@ -55,12 +60,27 @@ export async function findUserByEmail(email: string) {
 export async function seedApplications(
   email: string,
   rows: Omit<TablesInsert<"applications">, "user_id">[],
+): Promise<{ id: string; company: string }[]> {
+  const user = await findUserByEmail(email);
+  if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
+  const { data, error } = await adminClient()
+    .from("applications")
+    // defaultToNull: false lets rows leave out columns (PostgREST otherwise nulls them in a bulk insert).
+    .insert(rows.map((row) => ({ ...row, user_id: user.id })), { defaultToNull: false })
+    .select("id, company");
+  if (error) throw error;
+  return data;
+}
+
+/** Interviews on applications from `seedApplications` (same user). */
+export async function seedInterviews(
+  email: string,
+  rows: Omit<TablesInsert<"interviews">, "user_id">[],
 ): Promise<void> {
   const user = await findUserByEmail(email);
   if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
   const { error } = await adminClient()
-    .from("applications")
-    // defaultToNull: false lets rows leave out columns (PostgREST otherwise nulls them in a bulk insert).
+    .from("interviews")
     .insert(rows.map((row) => ({ ...row, user_id: user.id })), { defaultToNull: false });
   if (error) throw error;
 }

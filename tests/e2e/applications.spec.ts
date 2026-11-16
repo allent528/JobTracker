@@ -36,6 +36,7 @@ test.describe("at phone width", () => {
 
   test("create, edit, change status, archive and delete an application", async ({ page, signInAs }) => {
     await signInAs(TEST_USERS.applications);
+    await page.goto("/applications");
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     await expect(page.getByText("No applications yet.")).toBeVisible();
 

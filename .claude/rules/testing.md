@@ -35,7 +35,9 @@ paths:
 - `getByRole("alert")` also matches Next's empty `#__next-route-announcer__`; filter by text (`.filter({ hasText })`).
 - Signed-in specs use the `signInAs(email, page?)` fixture from `tests/e2e/support/fixtures.ts` (import `test`/`expect` from there): it deletes the user's applications, makes a magic-link token hash with the admin API and opens `/auth/confirm` with it. No email involved. Pass a page from `browser.newContext()` to sign in a second user. Add a user per test to `TEST_USERS`.
 - Hidden, still-mounted routes (docs/learnings.md) mean `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`.
-- `signInAs` ends on `/applications`, because `/` redirects there until step 7.
+- `signInAs` clears the user's applications and `profiles.time_zone`, then ends on `/` (the reminders home page). The browser's zone is saved on that first load, so `playwright.config.ts` sets `timezoneId: "UTC"`; a spec that needs another zone opens `browser.newContext({ timezoneId })`.
+- Seed interviews with `seedInterviews(email, rows)`; `seedApplications` returns `{ id, company }` for each row.
+- For time-zone e2e that must not depend on the time of day, compare Pacific/Kiritimati (UTC+14) with Pacific/Pago_Pago (UTC-11): their dates always differ.
 - Seed fake rows with `seedApplications(email, rows)` from `local-env.ts` after signing in, since sign-in clears the user's applications. It inserts with `defaultToNull: false`, so rows can leave columns out.
 - To check for flakes, repeat serially: `--repeat-each=N --workers=1`. Parallel repeats run copies of a test as the same user, and each copy's `signInAs` deletes the others' rows.
 - Board drag and drop works in Playwright: `page.mouse` down, `move(..., { steps })`, up. Start on the card's padding, not its link or menu.

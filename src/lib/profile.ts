@@ -6,12 +6,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { type DateOnly, dateInTimeZone, FALLBACK_TIME_ZONE } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
 
-export const getTimeZone = cache(async (): Promise<string> => {
+/** The saved zone, or null until it's detected from the browser (F8) or picked in settings. */
+export const getStoredTimeZone = cache(async (): Promise<string | null> => {
   const user = await getCurrentUser();
   const supabase = await createClient();
-  const { data } = await supabase.from("profiles").select("time_zone").eq("id", user.id).maybeSingle();
-  return data?.time_zone ?? FALLBACK_TIME_ZONE;
+  const { data, error } = await supabase.from("profiles").select("time_zone").eq("id", user.id).maybeSingle();
+  if (error) throw new Error("Couldn't load your settings.");
+  return data?.time_zone ?? null;
 });
+
+export const getTimeZone = cache(async (): Promise<string> => (await getStoredTimeZone()) ?? FALLBACK_TIME_ZONE);
 
 /** Today in the owner's time zone (D11), once per request so every caller agrees. */
 export const getToday = cache(async (): Promise<DateOnly> => {

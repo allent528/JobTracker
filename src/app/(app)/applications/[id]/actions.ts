@@ -6,6 +6,7 @@ import { z } from "zod";
 import { type ActionResult, parseOr } from "@/lib/action-result";
 import { applicationPath } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
+import { HOME_PATH } from "@/lib/auth-routes";
 import { writeErrorMessage } from "@/lib/db-errors";
 import { localDateTimeToInstant } from "@/lib/dates";
 import {
@@ -48,8 +49,8 @@ async function parseRequest<S extends z.ZodType>(
   return parsed.ok ? { ok: true, data: { ...parsedId.data, values: parsed.data } } : parsed;
 }
 
-/** Pages that list upcoming interviews (none until the home page exists). */
-const INTERVIEW_LIST_PATHS: readonly string[] = [];
+/** Pages that list upcoming interviews. */
+const INTERVIEW_LIST_PATHS: readonly string[] = [HOME_PATH];
 
 function revalidateDetail(table: ChildTable, row: ChildRow): void {
   revalidatePath(applicationPath(row.application_id));
