@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Application · JobTracker" };
 
 export default function ApplicationPage({ params }: PageProps<"/applications/[id]">) {
   return (
-    <div className="grid gap-6">
+    <div className="grid max-w-5xl gap-6">
       <Link href={APPLICATIONS_PATH} className="text-sm font-medium underline underline-offset-4 justify-self-start">
         All applications
       </Link>

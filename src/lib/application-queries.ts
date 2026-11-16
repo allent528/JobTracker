@@ -4,16 +4,15 @@ import { notFound } from "next/navigation";
 
 import type { Application } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
-import type { WorkMode } from "@/lib/closed-sets";
-import { dateInTimeZone, daysBetween } from "@/lib/dates";
 import type { PipelineItem } from "@/lib/pipeline";
-import { getTimeZone } from "@/lib/profile";
+import { selectPipeline, toPipelineItems } from "@/lib/pipeline-query";
+import { getTimeZone, getToday } from "@/lib/profile";
 import { applicationIdSchema } from "@/lib/schemas/application";
 import type { Status } from "@/lib/status";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
 
-// Narrowing casts below are the one place stored text becomes `Status` / `WorkMode`. They're safe
+// Narrowing casts here and in pipeline-query.ts are the only places stored text becomes `Status` / `WorkMode`. They're safe
 // because the applications_status_check and applications_work_mode_check constraints only allow
 // those values, and check-constraints.test.ts keeps the constraints equal to STATUSES and
 // WORK_MODES. status_events copies a checked status in its trigger, so renaming or removing a
@@ -56,33 +55,10 @@ export async function getStatusHistory(applicationId: string): Promise<StatusEve
   return data as StatusEvent[];
 }
 
-// The latest status event is when the current status began: the trigger logs every change (D5).
-// PostgREST applies the embedded order and limit per application, so this stays one query.
-const PIPELINE_COLUMNS =
-  "id, company, role_title, status, work_mode, date_applied, next_follow_up_on, archived_at, created_at, updated_at, status_events(changed_at)" as const;
-
-/**
- * Every application, archived ones included (the views filter them, D10), with days in the current
- * status counted in the owner's time zone. `today` is that zone's date, for follow-up states.
- */
-export async function listPipeline(): Promise<{ items: PipelineItem[]; today: string; timeZone: string }> {
-  const [user, timeZone] = await Promise.all([getCurrentUser(), getTimeZone()]);
+export async function listPipeline(): Promise<PipelineItem[]> {
+  const [user, timeZone, today] = await Promise.all([getCurrentUser(), getTimeZone(), getToday()]);
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("applications")
-    .select(PIPELINE_COLUMNS)
-    .eq("user_id", user.id)
-    .order("updated_at", { ascending: false })
-    .order("changed_at", { referencedTable: "status_events", ascending: false })
-    .limit(1, { referencedTable: "status_events" });
+  const { data, error } = await selectPipeline(supabase, user.id);
   if (error) throw new Error("Couldn't load your applications.");
-
-  const today = dateInTimeZone(new Date(), timeZone);
-  const items = data.map(({ status_events, created_at, status, work_mode, ...row }) => ({
-    ...row,
-    status: status as Status,
-    work_mode: work_mode as WorkMode | null,
-    days_in_status: daysBetween(dateInTimeZone(status_events[0]?.changed_at ?? created_at, timeZone), today),
-  }));
-  return { items, today, timeZone };
+  return toPipelineItems(data, timeZone, today);
 }

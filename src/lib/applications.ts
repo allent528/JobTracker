@@ -11,7 +11,6 @@ export type Application = Omit<Tables<"applications">, "status" | "work_mode"> &
 
 export const APPLICATION_NOT_FOUND = "That application no longer exists.";
 
-/** The pipeline (table and board). `/` is left for the reminders home page (step 7). */
 export const APPLICATIONS_PATH = "/applications";
 
 export const NEW_APPLICATION_PATH = `${APPLICATIONS_PATH}/new`;
@@ -78,12 +77,12 @@ export function formatSalaryRange(min: number | null, max: number | null, curren
 export const PIPELINE_VIEWS = ["board", "table"] as const;
 export type PipelineView = (typeof PIPELINE_VIEWS)[number];
 export const VIEW_PARAM = "view";
+const DEFAULT_VIEW: PipelineView = "board";
 
-/** The board is the default view; anything unrecognised falls back to it. */
 export function parsePipelineView(value: string | string[] | undefined): PipelineView {
-  return value === "table" ? "table" : "board";
+  return PIPELINE_VIEWS.find((view) => view === value) ?? DEFAULT_VIEW;
 }
 
 export function pipelineViewPath(view: PipelineView): string {
-  return view === "board" ? APPLICATIONS_PATH : `${APPLICATIONS_PATH}?${VIEW_PARAM}=${view}`;
+  return view === DEFAULT_VIEW ? APPLICATIONS_PATH : `${APPLICATIONS_PATH}?${VIEW_PARAM}=${view}`;
 }

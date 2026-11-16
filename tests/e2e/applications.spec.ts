@@ -175,6 +175,13 @@ test("another user can't open someone else's application", async ({ browser, pag
         await expect(other.getByText(text)).toHaveCount(0);
       }
     }
+    for (const path of ["/applications", "/applications?view=table"]) {
+      await other.goto(path);
+      await expect(other.getByText("No applications yet.")).toBeVisible();
+      for (const text of ["Initech", "Platform Engineer"]) {
+        await expect(other.getByText(text)).toHaveCount(0);
+      }
+    }
   } finally {
     await otherContext.close();
   }

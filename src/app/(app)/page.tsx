@@ -4,7 +4,6 @@ import { Suspense } from "react";
 
 import { APPLICATIONS_PATH } from "@/lib/applications";
 
-// Placeholder: `/` becomes the reminders home page in step 7. Until then it opens the pipeline.
 export default function Home() {
   return (
     <Suspense fallback={null}>

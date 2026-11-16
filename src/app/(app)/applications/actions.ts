@@ -67,8 +67,13 @@ async function deleteOwnApplication(userId: string, id: string): Promise<ActionR
   );
 }
 
-function revalidateApplication(id: string) {
+/** Every page that lists applications. Step 7 adds the home page (`/`) here. */
+function revalidatePipeline() {
   revalidatePath(APPLICATIONS_PATH);
+}
+
+function revalidateApplication(id: string) {
+  revalidatePipeline();
   revalidatePath(applicationPath(id));
 }
 
@@ -85,7 +90,7 @@ export async function createApplication(input: ApplicationFormValues): Promise<A
     .single();
   if (error) return { ok: false, error: writeErrorMessage(error) };
 
-  revalidatePath(APPLICATIONS_PATH);
+  revalidatePipeline();
   redirect(applicationPath(data.id));
 }
 
@@ -142,6 +147,6 @@ export async function deleteApplication(id: string): Promise<ActionResult<never>
   const result = await deleteOwnApplication(user.id, parsedId.data);
   if (!result.ok) return result;
 
-  revalidatePath(APPLICATIONS_PATH);
+  revalidatePipeline();
   redirect(APPLICATIONS_PATH);
 }

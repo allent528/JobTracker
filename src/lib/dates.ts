@@ -18,8 +18,10 @@ export function formatDateTime(timestamp: string, timeZone: string): string {
   );
 }
 
-/** The calendar date (`YYYY-MM-DD`) of an instant in `timeZone`. */
-export function dateInTimeZone(instant: Date | string, timeZone: string): string {
+/** A calendar date as `YYYY-MM-DD`; compares correctly as a string. */
+export type DateOnly = string;
+
+export function dateInTimeZone(instant: Date | string, timeZone: string): DateOnly {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
@@ -30,8 +32,7 @@ export function dateInTimeZone(instant: Date | string, timeZone: string): string
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
-/** Whole calendar days from `from` to `to` (both `YYYY-MM-DD`); negative if `to` is earlier. */
-export function daysBetween(from: string, to: string): number {
+export function daysBetween(from: DateOnly, to: DateOnly): number {
   const utc = (date: string) => {
     const [year, month, day] = date.split("-").map(Number);
     return Date.UTC(year, month - 1, day);

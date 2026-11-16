@@ -214,36 +214,60 @@
 - Cosmetic: `notFound()` inside Suspense streams the not-found UI with HTTP 200.
 
 ## 2026-11-14: Launch step 5 (Pipeline views, F3)
-**Status:** Done, pending owner review (branch `feat/pipeline-views`). No migration; nothing touched prod.
+**Status:** Done, pending owner review (PR 5, branch `feat/pipeline-views`). Review fixes applied 2026-11-15. No migration; nothing touched prod.
 **What was done**
 - Routes:
-  - `/applications` is the pipeline: Board (default) and Table (`?view=table`), switched by a two-link nav with `aria-current`. Replaces step 4's home list.
-  - `/` redirects to `/applications` for now (`src/app/(app)/page.tsx`), so step 7 can put the reminders home page there by replacing that one file. The redirect runs at request time behind `<Suspense>` + `connection()`: a bare `redirect()` fails Cache Components prerender validation, and a `next.config` redirect misses the sign-in Server Action's in-process redirect to `/` (see learnings).
-- Data: `listPipeline()` in `src/lib/application-queries.ts` (replaces `listApplications`) reads every application, archived included, in one query. It embeds the latest `status_events.changed_at` per application (`.order(..., { referencedTable }).limit(1, { referencedTable })`), so "days in current status" needs no view, RPC or migration. Days and `today` are computed in `profiles.time_zone` (UTC fallback).
-- Pure logic in `src/lib/pipeline.ts` (unit-tested): `followUpState`, `compareBoardCards` (D9: follow-up date ascending, so overdue first; then no follow-up; ties newest update first), `boardColumns`, `filterApplications`, `sortApplications`, `nextSort`, `formatDaysInStatus`. `dateInTimeZone` and `daysBetween` in `dates.ts`; `isWorkMode` in `closed-sets.ts`; `parsePipelineView`, `pipelineViewPath` and `APPLICATIONS_PATH` in `applications.ts`.
-- Board (`pipeline-board.tsx`): `@dnd-kit/core` 6.3.1 (repo clauderic/dnd-kit, checked), one droppable per active status, `DragOverlay`, mouse sensor (8px) and touch sensor (250ms long press, so a swipe still scrolls). "Show closed (n)" adds the closed columns; archived cards never show on the board. Cards: company, role, days in status, next follow-up with an Overdue / Due today badge (text, not colour only), and a Move menu (Radix radio menu with every status), which is the keyboard and screen reader path. Moves go through `useChangeStatus(setOptimistic)` with `useOptimistic`, so a failed move rolls back and shows the action's error toast. Custom dnd-kit announcements use company and status labels instead of ids.
-- Table (`pipeline-table.tsx`): sortable headers (buttons, `aria-sort`) for company, role, status (lifecycle order), date applied (blanks last) and last updated (date in the owner's zone); filters for status, work mode and "Show archived"; search over company and role (case-insensitive, trimmed); a `role="status"` result count. Filter state is client state (kept while the route stays mounted), not in the URL.
-- Actions revalidate and redirect to `/applications` instead of `/`; "All applications" and the new-application Cancel link go there.
+  - `/applications` is the pipeline: Board (default) and Table (`?view=table`), switched by a two-link nav with `aria-current`. It replaces step 4's home list.
+  - `/` redirects to `/applications` (`src/app/(app)/page.tsx`), so step 7 can put the reminders home page there by replacing that one file. The redirect runs at request time behind `<Suspense>` and `connection()` (see learnings).
+  - The signed-in shell (header and main) is `max-w-7xl`, so five board columns fit at 1280px. The detail page caps itself at `max-w-5xl`; the forms already cap at `max-w-3xl`.
+- Data:
+  - `listPipeline()` in `src/lib/application-queries.ts` (replaces `listApplications`) reads every application, archived included, in one query.
+  - The query and its row mapping live in `src/lib/pipeline-query.ts` (`selectPipeline`, `toPipelineItems`), outside `server-only`, so the local-stack suite runs the real query. It embeds each application's newest `status_events.changed_at` (`.order` and `.limit(1)` with `referencedTable`), so "days in current status" needs no view, RPC or migration.
+  - `getToday()` in `src/lib/profile.ts` gives today in `profiles.time_zone` (UTC fallback), cached per request. The page fetches items, today and the time zone with one `Promise.all`.
+- Pure logic, all unit-tested:
+  - `src/lib/pipeline.ts`: `compareBoardCards`, `boardColumns`, `countClosed`, `filterApplications`, `sortApplications`, `nextSort`, `formatDaysInStatus`. `PipelineItem` is a `Pick` of `Application` plus `days_in_status`.
+  - `src/lib/follow-ups.ts`: `followUpState`, with `<FollowUpBadge>` in `src/components/` for step 6 and 7 to reuse.
+  - `dates.ts`: `DateOnly`, `dateInTimeZone`, `daysBetween`. `closed-sets.ts`: `isWorkMode`. `applications.ts`: `APPLICATIONS_PATH` and the view helpers.
+- Board (`pipeline-board.tsx`):
+  - `@dnd-kit/core` 6.3.1. I checked the package: repo clauderic/dnd-kit, maintainer clauderic.
+  - One droppable column per active status, with a `DragOverlay` the size of the card. The mouse sensor starts after 8px; the touch sensor starts on a 250ms long press, so a swipe still scrolls.
+  - "Show closed (n)" adds the closed columns. Archived cards never show on the board.
+  - Cards show company, role, days in status, and the next follow-up with an Overdue or Due today badge (text, not colour only).
+  - Each card has a Move menu (a Radix radio menu with every status). It is the keyboard and screen reader path.
+  - Moves go through `useChangeStatus(setOptimistic)` with `useOptimistic`. A failed move rolls back and shows the action's error. A move that can't reach the server shows "Couldn't reach the server. Try again." and rolls back, instead of crashing to the error screen.
+  - Custom dnd-kit announcements use company and status labels instead of ids.
+- Table (`pipeline-table.tsx`):
+  - Sortable headers (buttons with `aria-sort`) for company, role, status (lifecycle order), date applied (blanks last) and last updated (a date in the owner's zone).
+  - Filters for status, work mode and "Show archived", and search over company and role (case-insensitive, trimmed). A `role="status"` line shows the result count.
+  - Filter state is client state (kept while the route stays mounted), not in the URL.
+- Actions call one `revalidatePipeline()` (plus the detail path where it applies) and redirect to `/applications`.
+- `src/app/(app)/error.tsx`: a plain "Something went wrong" page with Try again, as a safety net for unexpected errors. It doesn't log the error.
 - shadcn: dropdown-menu, table, checkbox.
 **Tests**
-- Unit: pipeline ordering, columns, filters, sorting, labels; `dateInTimeZone` across zones and the US DST change; `daysBetween` across DST and leap days; view helpers.
-- E2E `tests/e2e/pipeline.spec.ts` (fake data seeded with the new `seedApplications` helper; 5 new test users):
-  - Table: default order, every sortable column, status / work mode / archived filters, search, empty result.
-  - Board: active columns shown, closed and archived hidden, "Show closed" toggles Rejected, automatic order (overdue, later follow-up, none), Overdue / Due today / no follow-up labels; keyboard-only move through the Move menu, kept after reload, history shows "Applied → Screening".
-  - Drag and drop with the mouse (Saved to Screening), kept after reload, history logged. Reliable in Playwright (4 repeats, no flakes).
-  - Rollback: the row is deleted behind the board's back; the move shows "That application no longer exists." and the card stays in Saved.
-  - 375px: board and table have no horizontal page scroll; the board scrolls in its own container.
-- `applications.spec.ts` and `auth.spec.ts` updated for `/applications` (the archived check now uses the table's "Show archived").
-**Checks:** typecheck, lint, `npm test` (96/96), build with the CI placeholder env, `npm run test:e2e` (12/12), `npm run test:rls` (29/29). Dev server log clean during e2e.
+- Unit: board order, columns, `countClosed`, filters, sorting, labels, `followUpState`, view helpers.
+- Unit: `dateInTimeZone` across zones and the US DST change; `daysBetween` across DST and leap days.
+- Local stack: `tests/rls/pipeline-query.test.ts` runs `selectPipeline` as a signed-in user. It backdates two applications' first status events through the local superuser, changes one status, and checks that each row embeds only its newest event and that days in status are 0 and 10. Dropping `referencedTable` from the `.limit` makes it fail (checked). The RLS suite's sign-in helpers moved to `tests/rls/support.ts`.
+- E2E `tests/e2e/pipeline.spec.ts`, with fake data from the new `seedApplications` helper and 5 new test users:
+  - Table: default order, every sortable column, the status, work mode and archived filters, search, and an empty result.
+  - Board: all active columns shown and fitting at 1280px; closed and archived hidden; "Show closed" toggles Rejected; automatic order; the Overdue, Due today and no-follow-up labels.
+  - Keyboard: a move through the Move menu persists after reload, and history shows "Applied → Screening".
+  - Drag and drop: a mouse drag from Saved to Screening persists after reload and logs history. The whole pipeline spec passed three repeats with no flakes (`--repeat-each=3 --workers=1`; parallel repeats share each test's user and delete each other's rows).
+  - Rollback: the test deletes the row directly through the admin client and holds the Server Action request. The card shows in Offer first, then returns to Saved with "That application no longer exists." when the request goes through.
+  - Network failure: with the action request aborted, the card returns to Saved, the toast says the server couldn't be reached, and the page stays up. Without the try/catch this test fails (checked).
+  - 375px: neither view scrolls the page sideways; the board scrolls in its own container.
+- `applications.spec.ts`: a second user's `/applications` and `?view=table` show the empty state and none of the first user's text. It and `auth.spec.ts` also moved to `/applications`.
+**Checks:** typecheck, lint, `npm test`, build with the CI placeholder env, `npm run test:e2e`, `npm run test:rls` (run on its own): all pass. Counts are in the PR. The browser console is clean on the board, table and detail pages.
 **Decisions / defaults**
-- Days in status come from the embedded latest status event (no migration), counted as calendar days in the owner's zone; 0 shows "In status since today".
-- Board is the default view (F3's first bullet, "see at a glance"); the table is `?view=table`.
-- Closed statuses are filtered out of the board by default; "Show closed (n)" adds their columns (droppable too). Archived applications appear only in the table, behind "Show archived" (D10).
-- Board order uses the follow-up date only; "overdue first" falls out of ascending dates. Cards with no follow-up come after all dated ones.
-- Table defaults to last updated, newest first. A new sort column starts A–Z for text and newest first for dates.
+- Days in status come from the embedded newest status event (no migration), counted as calendar days in the owner's zone; 0 shows "In status since today".
+- The board is the default view (F3's first bullet, "see at a glance"); the table is `?view=table`.
+- Closed statuses are filtered out of the board by default; "Show closed (n)" adds their columns, which accept drops too. Archived applications appear only in the table, behind "Show archived" (D10).
+- Board order sorts by follow-up date, so overdue cards come first without a separate check. Cards with no follow-up come after all dated ones.
+- The table defaults to last updated, newest first. A new sort column starts A–Z for text and newest first for dates.
 - No status change from the table; rows link to the detail page.
 - The pipeline loads every application once and filters on the client (fine at the PRD's 500; PostgREST's default max rows is 1000).
+- The signed-in shell is `max-w-7xl` so the board fits five columns at 1280px. Below that the board scrolls inside its own container, as before.
 **Follow-ups**
-- Step 7: replace `src/app/(app)/page.tsx` with the reminders home page and add `revalidatePath("/")` back to the application actions (they revalidate `/applications` and the detail page now). `listPipeline` already computes `today` in the owner's zone.
-- At 1280px the five active columns overflow the `max-w-5xl` main and scroll sideways. Consider a wider main on the pipeline page if the owner finds that awkward.
+- Step 7: replace `src/app/(app)/page.tsx` with the reminders home page and add `/` to `revalidatePipeline()`. Use `getToday()` and `<FollowUpBadge>`.
+- A board left open past midnight keeps the server's "today" until the next refresh (D11). Acceptable.
+- Step 8: average days per stage needs its own `status_events` query; the pipeline query only embeds the newest event.
 - Over 1000 applications the pipeline query would hit PostgREST's row cap; paginate or filter server-side then.

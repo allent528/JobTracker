@@ -17,7 +17,7 @@ import { ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
 import { useId, useOptimistic, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { FollowUpBadge } from "@/components/follow-up-badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -30,23 +30,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { applicationPath } from "@/lib/applications";
-import { formatDate } from "@/lib/dates";
-import { boardColumns, followUpState, formatDaysInStatus, type PipelineItem } from "@/lib/pipeline";
+import { type DateOnly, formatDate } from "@/lib/dates";
+import { followUpState } from "@/lib/follow-ups";
+import { boardColumns, countClosed, formatDaysInStatus, type PipelineItem } from "@/lib/pipeline";
 import { isStatus, STATUS_META, type Status, STATUSES } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 import { type StatusMove, useChangeStatus } from "./use-change-status";
 
-type BoardProps = { items: PipelineItem[]; today: string };
+type BoardProps = { items: PipelineItem[]; today: DateOnly };
 
 function applyMove(items: PipelineItem[], move: StatusMove): PipelineItem[] {
-  return items.map((item) => (item.id === move.id ? { ...item, status: move.status, days_in_status: 0 } : item));
+  // The server sets updated_at too, so the card keeps its place when the refreshed list arrives.
+  const moved = { status: move.status, days_in_status: 0, updated_at: new Date().toISOString() };
+  return items.map((item) => (item.id === move.id ? { ...item, ...moved } : item));
 }
 
-/**
- * One droppable column per active status (closed ones behind "Show closed"). Drag a card, or use
- * its Move menu (the keyboard path), to change status. Order within a column is automatic (D9).
- */
 export function PipelineBoard({ items, today }: BoardProps) {
   const dndId = useId();
   const showClosedId = useId();
@@ -61,9 +60,6 @@ export function PipelineBoard({ items, today }: BoardProps) {
   );
 
   const find = (id: UniqueIdentifier) => optimisticItems.find((item) => item.id === id);
-  const closedCount = optimisticItems.filter(
-    (item) => item.archived_at === null && STATUS_META[item.status].kind === "closed",
-  ).length;
   const dragging = draggingId === null ? undefined : find(draggingId);
 
   function move(id: string, status: Status) {
@@ -98,7 +94,7 @@ export function PipelineBoard({ items, today }: BoardProps) {
           checked={showClosed}
           onCheckedChange={(checked) => setShowClosed(checked === true)}
         />
-        <Label htmlFor={showClosedId}>Show closed ({closedCount})</Label>
+        <Label htmlFor={showClosedId}>Show closed ({countClosed(optimisticItems)})</Label>
       </div>
       <DndContext
         id={dndId}
@@ -108,7 +104,7 @@ export function PipelineBoard({ items, today }: BoardProps) {
         onDragEnd={onDragEnd}
         onDragCancel={() => setDraggingId(null)}
       >
-        {/* relative: keeps the columns' sr-only (absolute) text inside the scroller, not widening the page. */}
+        {/* `relative`: sr-only text is position: absolute and would otherwise widen the page. */}
         <div className="relative flex gap-3 overflow-x-auto pb-2">
           {boardColumns(optimisticItems, { showClosed }).map(({ status, cards }) => (
             <BoardColumn key={status} status={status} cards={cards} today={today} onMove={move} />
@@ -116,7 +112,7 @@ export function PipelineBoard({ items, today }: BoardProps) {
         </div>
         <DragOverlay>
           {dragging && (
-            <div className="w-64 rotate-2 cursor-grabbing rounded-md border bg-card p-3 shadow-lg">
+            <div className="h-full rotate-2 cursor-grabbing rounded-md border bg-card p-3 shadow-lg">
               <CardSummary item={dragging} today={today} />
             </div>
           )}
@@ -129,7 +125,7 @@ export function PipelineBoard({ items, today }: BoardProps) {
 type ColumnProps = {
   status: Status;
   cards: PipelineItem[];
-  today: string;
+  today: DateOnly;
   onMove: (id: string, status: Status) => void;
 };
 
@@ -142,7 +138,7 @@ function BoardColumn({ status, cards, today, onMove }: ColumnProps) {
       ref={setNodeRef}
       aria-labelledby={headingId}
       className={cn(
-        "flex w-64 shrink-0 flex-col gap-2 rounded-lg bg-muted/60 p-2 sm:w-72",
+        "flex w-64 shrink-0 flex-col gap-2 rounded-lg bg-muted/60 p-2 lg:w-auto lg:min-w-56 lg:flex-1",
         isOver && "ring-2 ring-ring",
       )}
     >
@@ -154,7 +150,7 @@ function BoardColumn({ status, cards, today, onMove }: ColumnProps) {
         </span>
       </h2>
       {cards.length === 0 ? (
-        <p className="px-1 py-6 text-center text-sm text-muted-foreground">Nothing here</p>
+        <p className="px-1 py-6 text-center text-sm text-muted-foreground">No applications</p>
       ) : (
         <ul className="grid gap-2">
           {cards.map((item) => (
@@ -192,8 +188,7 @@ function BoardCard({ item, today, onMove }: { item: PipelineItem } & Omit<Column
   );
 }
 
-function CardSummary({ item, today }: { item: PipelineItem; today: string }) {
-  const followUp = followUpState(item.next_follow_up_on, today);
+function CardSummary({ item, today }: { item: PipelineItem; today: DateOnly }) {
   return (
     <span className="grid gap-1">
       <span className="font-medium break-words">{item.company}</span>
@@ -203,8 +198,7 @@ function CardSummary({ item, today }: { item: PipelineItem; today: string }) {
         {item.next_follow_up_on ? (
           <>
             <span>Follow up {formatDate(item.next_follow_up_on)}</span>
-            {followUp === "overdue" && <Badge variant="destructive">Overdue</Badge>}
-            {followUp === "today" && <Badge>Due today</Badge>}
+            <FollowUpBadge state={followUpState(item.next_follow_up_on, today)} />
           </>
         ) : (
           <span className="text-muted-foreground">No follow-up set</span>

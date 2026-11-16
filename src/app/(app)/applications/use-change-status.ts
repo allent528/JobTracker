@@ -1,7 +1,9 @@
 "use client";
 
 import { useTransition } from "react";
+import { toast } from "sonner";
 
+import { UNREACHABLE_ERROR } from "@/lib/action-result";
 import { STATUS_META, type Status } from "@/lib/status";
 import { toastResult } from "@/lib/toast-result";
 
@@ -10,8 +12,8 @@ import { changeStatus } from "./actions";
 export type StatusMove = { id: string; status: Status };
 
 /**
- * Shared by the detail page and the board. The board passes a `useOptimistic` setter, which runs
- * inside the transition: the move shows at once and rolls back if the action fails (D12).
+ * `applyOptimistic` (a `useOptimistic` setter) must run inside the transition; React drops the
+ * optimistic value when the transition ends, which is the rollback on failure.
  */
 export function useChangeStatus(applyOptimistic?: (move: StatusMove) => void) {
   const [pending, startTransition] = useTransition();
@@ -19,7 +21,12 @@ export function useChangeStatus(applyOptimistic?: (move: StatusMove) => void) {
   function change(id: string, status: Status) {
     startTransition(async () => {
       applyOptimistic?.({ id, status });
-      toastResult(await changeStatus({ id, status }), `Moved to ${STATUS_META[status].label}.`);
+      try {
+        toastResult(await changeStatus({ id, status }), `Moved to ${STATUS_META[status].label}.`);
+      } catch {
+        // A rejected Server Action (offline, server down) would otherwise reach the error boundary.
+        toast.error(UNREACHABLE_ERROR);
+      }
     });
   }
 

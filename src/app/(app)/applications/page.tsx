@@ -12,6 +12,9 @@ import {
   pipelineViewPath,
   VIEW_PARAM,
 } from "@/lib/applications";
+import type { DateOnly } from "@/lib/dates";
+import type { PipelineItem } from "@/lib/pipeline";
+import { getTimeZone, getToday } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 
 import { PipelineBoard } from "./pipeline-board";
@@ -38,8 +41,13 @@ export default function ApplicationsPage({ searchParams }: PageProps<"/applicati
 }
 
 async function Pipeline({ searchParams }: Pick<PageProps<"/applications">, "searchParams">) {
-  const view = parsePipelineView((await searchParams)[VIEW_PARAM]);
-  const { items, today, timeZone } = await listPipeline();
+  const [params, items, today, timeZone] = await Promise.all([
+    searchParams,
+    listPipeline(),
+    getToday(),
+    getTimeZone(),
+  ]);
+  const view = parsePipelineView(params[VIEW_PARAM]);
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
@@ -62,11 +70,24 @@ async function Pipeline({ searchParams }: Pick<PageProps<"/applications">, "sear
         <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
           No applications yet. Add one to get started.
         </p>
-      ) : view === "board" ? (
-        <PipelineBoard items={items} today={today} />
       ) : (
-        <PipelineTable items={items} timeZone={timeZone} />
+        <PipelineContent view={view} items={items} today={today} timeZone={timeZone} />
       )}
     </div>
   );
+}
+
+type PipelineContentProps = { view: PipelineView; items: PipelineItem[]; today: DateOnly; timeZone: string };
+
+function PipelineContent({ view, items, today, timeZone }: PipelineContentProps) {
+  switch (view) {
+    case "board":
+      return <PipelineBoard items={items} today={today} />;
+    case "table":
+      return <PipelineTable items={items} timeZone={timeZone} />;
+    default: {
+      const unknownView: never = view;
+      throw new Error(`Unknown pipeline view: ${String(unknownView)}`);
+    }
+  }
 }

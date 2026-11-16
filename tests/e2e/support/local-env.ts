@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { OTP_LENGTH } from "../../../src/lib/schemas/auth";
+import type { Database, TablesInsert } from "../../../src/types/database.types";
 
 /** Fake test users (D4). Each spec uses its own address so parallel tests don't share an inbox. */
 export const TEST_USERS = {
@@ -37,7 +38,7 @@ export function localSupabaseUrl(): string {
 export function adminClient() {
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!key) throw new Error("SUPABASE_SECRET_KEY is not set in .env.local (local stack key, tests only).");
-  return createClient(localSupabaseUrl(), key, {
+  return createClient<Database>(localSupabaseUrl(), key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
@@ -48,8 +49,10 @@ export async function findUserByEmail(email: string) {
   return data.users.find((user) => user.email === email) ?? null;
 }
 
-/** Inserts fake applications for an existing test user (the status trigger logs each one). */
-export async function seedApplications(email: string, rows: Record<string, unknown>[]): Promise<void> {
+export async function seedApplications(
+  email: string,
+  rows: Omit<TablesInsert<"applications">, "user_id">[],
+): Promise<void> {
   const user = await findUserByEmail(email);
   if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
   const { error } = await adminClient()

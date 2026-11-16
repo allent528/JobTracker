@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   boardColumns,
   compareBoardCards,
+  countClosed,
   DEFAULT_TABLE_FILTERS,
   filterApplications,
-  followUpState,
   formatDaysInStatus,
   nextSort,
   type PipelineItem,
@@ -35,16 +35,6 @@ function item(overrides: Partial<PipelineItem> = {}): PipelineItem {
 }
 
 const ids = (items: PipelineItem[]) => items.map((i) => i.id);
-
-describe("followUpState", () => {
-  it("compares the follow-up date with today in the owner's zone", () => {
-    expect(followUpState(null, TODAY)).toBeNull();
-    expect(followUpState("2026-11-13", TODAY)).toBe("overdue");
-    expect(followUpState("2026-11-14", TODAY)).toBe("today");
-    expect(followUpState("2026-11-15", TODAY)).toBe("upcoming");
-    expect(followUpState("2025-12-31", "2026-01-01")).toBe("overdue");
-  });
-});
 
 describe("compareBoardCards", () => {
   it("puts overdue first, then by follow-up date, then no follow-up, newest update first on ties", () => {
@@ -92,7 +82,13 @@ describe("boardColumns", () => {
   it("adds the closed columns when asked", () => {
     const columns = boardColumns(items, { showClosed: true });
     expect(columns.map((c) => c.status)).toEqual(STATUSES);
-    expect(ids(columns.find((c) => c.status === "rejected")!.cards)).toEqual(["c"]);
+    expect(columns.find((c) => c.status === "rejected")?.cards.map((card) => card.id)).toEqual(["c"]);
+  });
+
+  it("counts unarchived closed applications for the Show closed toggle", () => {
+    expect(countClosed(items)).toBe(1);
+    expect(countClosed([...items, item({ status: "ghosted", archived_at: "2026-11-02T00:00:00+00:00" })])).toBe(1);
+    expect(countClosed([item({ status: "offer" })])).toBe(0);
   });
 });
 

@@ -1,12 +1,12 @@
-import type { Page } from "@playwright/test";
+import type { Page, Route } from "@playwright/test";
 
+import { UNREACHABLE_ERROR } from "../../src/lib/action-result";
 import { APPLICATION_NOT_FOUND } from "../../src/lib/applications";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_META } from "../../src/lib/status";
 import { expect, test } from "./support/fixtures";
-import { adminClient, seedApplications, TEST_USERS } from "./support/local-env";
+import { adminClient, findUserByEmail, seedApplications, TEST_USERS } from "./support/local-env";
 
-// The e2e users have no profiles.time_zone, so "today" is today in UTC (FALLBACK_TIME_ZONE).
-function dayFromToday(offset: number): string {
+function dayFromTodayUtc(offset: number): string {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + offset);
   return date.toISOString().slice(0, 10);
@@ -31,6 +31,14 @@ async function expectNoHorizontalScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
+/** How far the board's columns overflow their own scroller, in pixels. */
+function boardOverflow(page: Page): Promise<number> {
+  return column(page, "Saved").evaluate((el) => {
+    const scroller = el.parentElement;
+    return scroller ? scroller.scrollWidth - scroller.clientWidth : Number.NaN;
+  });
+}
+
 test("table view sorts, filters and searches", async ({ page, signInAs }) => {
   await signInAs(TEST_USERS.pipelineTable);
   await seedApplications(TEST_USERS.pipelineTable, [
@@ -45,7 +53,6 @@ test("table view sorts, filters and searches", async ({ page, signInAs }) => {
   const companies = table.locator("tbody tr td:first-child");
   const sortBy = (name: string) => table.getByRole("button", { name, exact: true }).click();
 
-  // Last updated, newest first; archived hidden.
   await expect(companies).toHaveText(["Globex", "Acme Corp", "Initech"]);
   await expect(table.getByRole("columnheader", { name: "Last updated" })).toHaveAttribute("aria-sort", "descending");
 
@@ -96,9 +103,9 @@ test("board shows active columns in automatic order and moves a card from its ke
   await signInAs(TEST_USERS.pipelineBoard);
   await seedApplications(TEST_USERS.pipelineBoard, [
     { company: "Plain Co", role_title: "Engineer", status: "applied", updated_at: "2026-11-10T10:00:00Z" },
-    { company: "Later Co", role_title: "Engineer", status: "applied", next_follow_up_on: dayFromToday(3) },
-    { company: "Overdue Co", role_title: "Engineer", status: "applied", next_follow_up_on: dayFromToday(-1) },
-    { company: "Today Co", role_title: "Engineer", status: "saved", next_follow_up_on: dayFromToday(0) },
+    { company: "Later Co", role_title: "Engineer", status: "applied", next_follow_up_on: dayFromTodayUtc(3) },
+    { company: "Overdue Co", role_title: "Engineer", status: "applied", next_follow_up_on: dayFromTodayUtc(-1) },
+    { company: "Today Co", role_title: "Engineer", status: "saved", next_follow_up_on: dayFromTodayUtc(0) },
     { company: "Closed Co", role_title: "Engineer", status: "rejected" },
     { company: "Archived Co", role_title: "Engineer", status: "saved", archived_at: "2026-11-02T10:00:00Z" },
   ]);
@@ -108,6 +115,8 @@ test("board shows active columns in automatic order and moves a card from its ke
   for (const status of CLOSED_STATUSES) await expect(column(page, STATUS_META[status].label)).toHaveCount(0);
   await expect(page.getByText("Archived Co")).toHaveCount(0);
   await expect(page.getByText("Closed Co")).toHaveCount(0);
+  // Playwright's Desktop Chrome is 1280px wide: all five active columns fit without scrolling.
+  expect(await boardOverflow(page)).toBeLessThanOrEqual(0);
 
   await expect(column(page, "Applied").getByRole("listitem")).toHaveText([/Overdue Co/, /Later Co/, /Plain Co/]);
   await expect(card(page, "Applied", "Overdue Co")).toContainText("Overdue");
@@ -170,21 +179,51 @@ test("dragging a card to another column changes its status", async ({ page, sign
   await expect(history(page).first()).toContainText("Saved → Screening");
 });
 
-test("a failed move rolls the card back", async ({ page, signInAs }) => {
+async function moveWithMenu(page: Page, company: string, status: string) {
+  await page.getByRole("button", { name: `Move ${company}, Engineer` }).click();
+  await page.getByRole("menuitemradio", { name: status }).click();
+}
+
+const isServerAction = (route: Route) =>
+  route.request().method() === "POST" && route.request().headers()["next-action"] !== undefined;
+
+test("a move shows at once and rolls back when it fails or can't reach the server", async ({ page, signInAs }) => {
   await signInAs(TEST_USERS.pipelineRollback);
-  await seedApplications(TEST_USERS.pipelineRollback, [{ company: "Gone Co", role_title: "Engineer", status: "saved" }]);
+  await seedApplications(TEST_USERS.pipelineRollback, [
+    { company: "Gone Co", role_title: "Engineer", status: "saved" },
+    { company: "Offline Co", role_title: "Engineer", status: "saved" },
+  ]);
   await page.goto("/applications");
   await expect(card(page, "Saved", "Gone Co")).toBeVisible();
 
-  // Delete it behind the board's back, so changeStatus finds no row.
-  const { error } = await adminClient().from("applications").delete().eq("company", "Gone Co");
+  const user = await findUserByEmail(TEST_USERS.pipelineRollback);
+  if (!user) throw new Error("Rollback test user is missing.");
+  const { error } = await adminClient().from("applications").delete().eq("user_id", user.id).eq("company", "Gone Co");
   if (error) throw error;
 
-  await page.getByRole("button", { name: "Move Gone Co, Engineer" }).click();
-  await page.getByRole("menuitemradio", { name: "Offer" }).click();
+  // Hold the Server Action until the optimistic move has been checked.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route("**/applications*", async (route) => {
+    if (!isServerAction(route)) return route.continue();
+    await held;
+    return route.continue();
+  });
+  await moveWithMenu(page, "Gone Co", "Offer");
+  await expect(card(page, "Offer", "Gone Co")).toBeVisible();
+  await expect(card(page, "Saved", "Gone Co")).toHaveCount(0);
+  release();
   await expect(page.getByText(APPLICATION_NOT_FOUND)).toBeVisible();
   await expect(card(page, "Saved", "Gone Co")).toBeVisible();
   await expect(card(page, "Offer", "Gone Co")).toHaveCount(0);
+
+  await page.unrouteAll({ behavior: "wait" });
+  await page.route("**/applications*", (route) => (isServerAction(route) ? route.abort() : route.continue()));
+  await moveWithMenu(page, "Offline Co", "Offer");
+  await expect(page.getByText(UNREACHABLE_ERROR)).toBeVisible();
+  await expect(card(page, "Saved", "Offline Co")).toBeVisible();
+  await expect(card(page, "Offer", "Offline Co")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
 });
 
 test.describe("at phone width", () => {
@@ -193,19 +232,14 @@ test.describe("at phone width", () => {
   test("board and table fit without horizontal page scroll", async ({ page, signInAs }) => {
     await signInAs(TEST_USERS.pipelinePhone);
     await seedApplications(TEST_USERS.pipelinePhone, [
-      { company: "Acme Corp", role_title: "Senior Software Engineer, Platform Infrastructure", status: "interviewing", next_follow_up_on: dayFromToday(-2) },
+      { company: "Acme Corp", role_title: "Senior Software Engineer, Platform Infrastructure", status: "interviewing", next_follow_up_on: dayFromTodayUtc(-2) },
       { company: "Globex", role_title: "Data Analyst", status: "saved", date_applied: "2026-10-01" },
     ]);
     await page.goto("/applications");
 
     await expect(card(page, "Interviewing", "Acme Corp")).toBeVisible();
     await expectNoHorizontalScroll(page);
-    // The board scrolls inside its own container instead.
-    const boardScrolls = await column(page, "Saved").evaluate((el) => {
-      const scroller = el.parentElement!;
-      return scroller.scrollWidth > scroller.clientWidth;
-    });
-    expect(boardScrolls).toBe(true);
+    expect(await boardOverflow(page)).toBeGreaterThan(0);
 
     await page.getByRole("link", { name: "Table" }).click();
     await expect(page.getByRole("table", { name: "Applications" }).getByRole("link", { name: "Acme Corp" })).toBeVisible();

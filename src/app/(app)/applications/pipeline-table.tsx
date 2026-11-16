@@ -140,7 +140,16 @@ export function PipelineTable({ items, timeZone }: { items: PipelineItem[]; time
                   </span>
                 </TableCell>
                 <TableCell>
-                  {item.date_applied ? formatDate(item.date_applied) : <span className="text-muted-foreground">—</span>}
+                  {item.date_applied ? (
+                    formatDate(item.date_applied)
+                  ) : (
+                    <>
+                      <span aria-hidden="true" className="text-muted-foreground">
+                        —
+                      </span>
+                      <span className="sr-only">Not set</span>
+                    </>
+                  )}
                 </TableCell>
                 <TableCell>{formatDate(dateInTimeZone(item.updated_at, timeZone))}</TableCell>
               </TableRow>
