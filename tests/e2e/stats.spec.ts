@@ -23,20 +23,26 @@ async function expectNoHorizontalScroll(page: Page) {
 
 const section = (page: Page, name: string | RegExp) => page.getByRole("region", { name });
 
-/** Moves an application through `statuses` (the trigger logs each), then backdates each event. */
+function backdateNewestEvent(applicationId: string, daysAgo: number) {
+  localSuperuserQuery(
+    `update public.status_events set changed_at = now() - interval '${daysAgo} days' where id = (select id from public.status_events where application_id = '${applicationId}' order by changed_at desc limit 1)`,
+  );
+}
+
+/**
+ * Walks a seeded application through `path`, whose first step is the status it was inserted with,
+ * backdating each event as it's logged.
+ */
 async function walk(id: string, path: { status: string; daysAgo: number }[]) {
-  for (const { status } of path) {
-    const { error } = await adminClient().from("applications").update({ status }).eq("id", id);
-    if (error) throw error;
-  }
-  for (const { status, daysAgo } of path) {
-    localSuperuserQuery(
-      `update public.status_events set changed_at = now() - interval '${daysAgo} days' where application_id = '${id}' and to_status = '${status}'`,
-    );
+  for (const [i, { status, daysAgo }] of path.entries()) {
+    if (i > 0) {
+      const { error } = await adminClient().from("applications").update({ status }).eq("id", id);
+      if (error) throw error;
+    }
+    backdateNewestEvent(id, daysAgo);
   }
 }
 
-/** Three unarchived applications and one archived; returns nothing the page doesn't show. */
 async function seedStats(email: string) {
   const today = dateInTimeZone(new Date(), "UTC");
   const apps = await seedApplications(email, [
@@ -77,13 +83,12 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Rejected 1" })).toBeVisible();
     await expect(byStatus.getByRole("row", { name: "Total 3" })).toBeVisible();
 
-    // Acme reached Screening; Globex went Applied → Rejected; Initech never reached Applied.
     const response = section(page, "Response rate");
     await expect(response.getByText("50%")).toBeVisible();
     await expect(response).toContainText("1 of 2 applications that reached Applied got to Screening or later.");
 
     const weekly = section(page, /^Applications per week/);
-    await expect(weekly).toContainText("2 applied in these 12 weeks.");
+    await expect(weekly).toContainText("2 applications in the last 12 weeks.");
     await expect(weekly.getByRole("img", { name: /Bar chart of applications per week/ })).toBeVisible();
     await weekly.getByText("Show as table").click();
     const weekRows = weekly.getByRole("row");
@@ -91,7 +96,6 @@ test.describe("at phone width", () => {
     await expect(weekRows.last()).toHaveText(/1$/); // this week: Acme
     await expect(weekRows.nth(11)).toHaveText(/1$/); // last week: Globex
 
-    // Applied: Acme 3 days, Globex 5 days. Screening and Rejected are current stages.
     const stages = section(page, "Average days in each stage");
     await expect(stages.getByRole("row", { name: "Applied 4 days 2" })).toBeVisible();
     await expect(stages.getByRole("row", { name: "Screening No data 0" })).toBeVisible();
@@ -103,7 +107,7 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Total 4" })).toBeVisible();
     await expect(byStatus.getByRole("row", { name: "Applied 1" })).toBeVisible();
     await expect(response.getByText("33%")).toBeVisible();
-    await expect(weekly).toContainText("3 applied in these 12 weeks.");
+    await expect(weekly).toContainText("3 applications in the last 12 weeks.");
 
     await page.reload();
     await expect(page.getByRole("checkbox", { name: "Include archived applications" })).toBeChecked();
@@ -127,13 +131,12 @@ test("another user sees an empty dashboard, not the owner's stats", async ({ bro
   const otherPage = await context.newPage();
   const consoleErrors = collectConsoleErrors(otherPage);
   await signInAs(TEST_USERS.statsIsolationOther, otherPage);
-  for (const [path, message] of [
-    ["/stats", "No applications to count yet. Archived applications count only when included."],
-    ["/stats?archived=1", "No applications to count yet."],
-  ]) {
+  for (const path of ["/stats", "/stats?archived=1"]) {
     await otherPage.goto(path);
     // Streaming can briefly leave a hidden copy of the content in the DOM.
-    await expect(otherPage.getByText(message, { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(
+      otherPage.getByText("No applications to count yet.", { exact: true }).filter({ visible: true }),
+    ).toBeVisible();
     for (const name of ["Applications by status", "Response rate", "Average days in each stage"]) {
       await expect(section(otherPage, name)).toHaveCount(0);
     }

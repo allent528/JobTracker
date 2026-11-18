@@ -5,6 +5,7 @@ import {
   forwardPathFrom,
   isStatus,
   nextSuggestedStatus,
+  RESPONSE_RATE_FROM,
   RESPONSE_RATE_STATUSES,
   STATUS_META,
   STATUSES,
@@ -63,7 +64,8 @@ describe("forwardPathFrom", () => {
     expect(forwardPathFrom("rejected")).toEqual([]);
   });
 
-  it("gives the response rate sets: screening or later, out of applied or later", () => {
+  it("builds the response rate sets from RESPONSE_RATE_FROM", () => {
+    expect(RESPONSE_RATE_FROM).toEqual({ reached: "applied", responded: "screening" });
     expect(RESPONSE_RATE_STATUSES.reached).toEqual(["applied", "screening", "interviewing", "offer", "accepted"]);
     expect(RESPONSE_RATE_STATUSES.responded).toEqual(["screening", "interviewing", "offer", "accepted"]);
   });

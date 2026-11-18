@@ -1,9 +1,5 @@
--- Stats dashboard (F9, D13). Each function returns raw facts for the signed-in user; status
--- classification (active/closed, "screening or later") stays in src/lib/status.ts, so no status
--- value appears here. Lists of statuses arrive as parameters.
--- All are security invoker, so the applications and status_events RLS policies apply as well as
--- the explicit user_id filter. "Today" comes from the app in the owner's time zone (D11); nothing
--- here reads now() or current_date. Archived applications count only when include_archived is true.
+-- Stats dashboard (F9, D13): security invoker functions, so RLS applies on top of each user_id filter.
+-- They return raw facts; status classification lives in src/lib/status.ts and src/lib/stats.ts.
 
 -- Applications per current status.
 create function public.stats_status_counts(include_archived boolean)
@@ -38,22 +34,28 @@ as $$
 $$;
 
 -- How many applications ever reached one of reached_statuses, and how many of those also ever
--- reached one of responded_statuses, going by their status history.
+-- reached one of responded_statuses, going by their status history. Each list holds at most 32.
 create function public.stats_response_counts(
   reached_statuses text[],
   responded_statuses text[],
   include_archived boolean
 )
 returns table (reached bigint, responded bigint)
-language sql
+language plpgsql
 stable
 security invoker
 set search_path = ''
 as $$
+begin
+  if cardinality(reached_statuses) > 32 or cardinality(responded_statuses) > 32 then
+    raise exception 'too_many_statuses' using errcode = '22023';
+  end if;
+
+  return query
   with per_application as (
     select
-      bool_or(e.to_status = any (reached_statuses)) as reached,
-      bool_or(e.to_status = any (responded_statuses)) as responded
+      bool_or(e.to_status = any (reached_statuses)) as has_reached,
+      bool_or(e.to_status = any (responded_statuses)) as has_responded
     from public.status_events e
     join public.applications a on a.id = e.application_id and a.user_id = e.user_id
     where e.user_id = (select auth.uid())
@@ -61,9 +63,10 @@ as $$
     group by e.application_id
   )
   select
-    count(*) filter (where p.reached),
-    count(*) filter (where p.reached and p.responded)
+    count(*) filter (where p.has_reached),
+    count(*) filter (where p.has_reached and p.has_responded)
   from per_application p;
+end;
 $$;
 
 -- Completed stays per status: a stay starts at a status event and ends at the application's next
@@ -95,6 +98,7 @@ as $$
   group by s.to_status;
 $$;
 
+-- Signed-in users only: no anon, and no service_role (nothing in v1 needs it).
 revoke execute on function public.stats_status_counts(boolean) from public, anon, service_role;
 revoke execute on function public.stats_applied_per_day(date, date, boolean) from public, anon, service_role;
 revoke execute on function public.stats_response_counts(text[], text[], boolean) from public, anon, service_role;

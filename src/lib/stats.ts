@@ -1,14 +1,13 @@
 import { addDays, type DateOnly, startOfWeek } from "@/lib/dates";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUSES, type Status } from "@/lib/status";
 
-// F9. The SQL functions (D13) return raw facts; this module classifies statuses and fills gaps.
-
 export const STATS_PATH = "/stats";
 export const STATS_WEEKS = 12;
 
 /** `?archived=1` includes archived applications in every stat. */
 export const INCLUDE_ARCHIVED_PARAM = "archived";
 
+/** Anything but a single `1` (including a repeated param) means the default, archived left out. */
 export function parseIncludeArchived(value: string | string[] | undefined): boolean {
   return value === "1";
 }
@@ -31,7 +30,7 @@ export type StatusCount = { status: Status; applications: number };
 export type StatusCounts = { active: StatusCount[]; closed: StatusCount[]; total: number };
 
 /** Every status, in lifecycle order, with 0 where the database returned no row. */
-export function toStatusCounts(rows: { status: Status; applications: number }[]): StatusCounts {
+export function toStatusCounts(rows: StatusCount[]): StatusCounts {
   const counts = new Map(rows.map((row) => [row.status, row.applications]));
   const list = (statuses: readonly Status[]) =>
     statuses.map((status) => ({ status, applications: counts.get(status) ?? 0 }));
@@ -57,33 +56,35 @@ export function toWeekCounts(rows: { day: DateOnly; applications: number }[], we
 
 export type ResponseRate = { reached: number; responded: number; percent: number | null };
 
-export function toResponseRate(row: { reached: number; responded: number } | undefined): ResponseRate {
-  const reached = row?.reached ?? 0;
-  const responded = row?.responded ?? 0;
-  return { reached, responded, percent: reached === 0 ? null : Math.round((responded / reached) * 100) };
+/** A whole percent that never rounds up to 100 while some applications haven't responded. */
+export function toResponseRate({ reached, responded }: { reached: number; responded: number }): ResponseRate {
+  if (reached === 0) return { reached, responded, percent: null };
+  const percent = Math.round((responded / reached) * 100);
+  return { reached, responded, percent: responded < reached ? Math.min(percent, 99) : percent };
 }
 
 export type StageDuration = { status: Status; stays: number; averageDays: number | null };
 
 /** Every status, in lifecycle order; `averageDays` is null when no stay in it has ended. */
-export function toStageDurations(
-  rows: { status: Status; stays: number; average_days: number }[],
-): StageDuration[] {
+export function toStageDurations(rows: { status: Status; stays: number; averageDays: number }[]): StageDuration[] {
   const byStatus = new Map(rows.map((row) => [row.status, row]));
   return STATUSES.map((status) => {
     const row = byStatus.get(status);
-    return { status, stays: row?.stays ?? 0, averageDays: row ? row.average_days : null };
+    return { status, stays: row?.stays ?? 0, averageDays: row ? row.averageDays : null };
   });
 }
 
-/** "4.5 days", "1 day", "0.3 days". */
+/** "4.5 days", "1 day", "<0.1 days" (more than 0 but under a tenth), "0 days". */
 export function formatDays(days: number): string {
   const rounded = Math.round(days * 10) / 10;
+  if (rounded === 0 && days > 0) return "<0.1 days";
   return `${rounded} ${rounded === 1 ? "day" : "days"}`;
 }
 
 export type Stats = {
   statusCounts: StatusCounts;
+  /** The first day of the 12-week window. */
+  fromDay: DateOnly;
   weeks: WeekCount[];
   responseRate: ResponseRate;
   stageDurations: StageDuration[];

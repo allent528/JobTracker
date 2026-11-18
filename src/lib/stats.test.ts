@@ -14,8 +14,7 @@ import {
 } from "./stats";
 
 describe("statsWindow", () => {
-  it("covers 12 Monday-start weeks ending with the week that holds today, half-open", () => {
-    // 2026-11-17 is a Tuesday.
+  it("covers 12 Monday-start weeks ending with the week that holds Tuesday 2026-11-17, half-open", () => {
     const window = statsWindow("2026-11-17");
     expect(window.weekStarts).toHaveLength(12);
     expect(window.weekStarts[11]).toBe("2026-11-16");
@@ -104,17 +103,21 @@ describe("toResponseRate", () => {
     expect(toResponseRate({ reached: 3, responded: 2 }).percent).toBe(67);
   });
 
+  it("never shows 100% while some haven't responded", () => {
+    expect(toResponseRate({ reached: 200, responded: 199 }).percent).toBe(99);
+    expect(toResponseRate({ reached: 200, responded: 200 }).percent).toBe(100);
+  });
+
   it("has no percent when nothing reached applied", () => {
-    expect(toResponseRate({ reached: 0, responded: 0 }).percent).toBeNull();
-    expect(toResponseRate(undefined)).toEqual({ reached: 0, responded: 0, percent: null });
+    expect(toResponseRate({ reached: 0, responded: 0 })).toEqual({ reached: 0, responded: 0, percent: null });
   });
 });
 
 describe("toStageDurations", () => {
   it("lists every status in lifecycle order, null where no stay has ended", () => {
     const durations = toStageDurations([
-      { status: "screening", stays: 2, average_days: 4.25 },
-      { status: "applied", stays: 3, average_days: 10 },
+      { status: "screening", stays: 2, averageDays: 4.25 },
+      { status: "applied", stays: 3, averageDays: 10 },
     ]);
     expect(durations.map((d) => d.status)).toEqual([...STATUSES]);
     expect(durations.find((d) => d.status === "applied")).toEqual({ status: "applied", stays: 3, averageDays: 10 });
@@ -128,6 +131,7 @@ describe("formatDays", () => {
     [1, "1 day"],
     [0.96, "1 day"],
     [0.3, "0.3 days"],
+    [0.04, "<0.1 days"],
     [0, "0 days"],
     [12, "12 days"],
   ])("%s → %s", (days, text) => {

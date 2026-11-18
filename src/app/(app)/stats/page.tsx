@@ -4,9 +4,8 @@ import { Suspense } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getStats } from "@/lib/application-queries";
-import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/dates";
-import { STATUS_META } from "@/lib/status";
+import { RESPONSE_RATE_FROM, STATUS_META } from "@/lib/status";
 import {
   formatDays,
   INCLUDE_ARCHIVED_PARAM,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 
+import { STATS_MARK_COLOR } from "./chart-color";
 import { IncludeArchivedToggle } from "./include-archived-toggle";
 import { WeeklyChart } from "./weekly-chart";
 
@@ -36,8 +36,7 @@ export default function StatsPage({ searchParams }: PageProps<"/stats">) {
 }
 
 async function StatsContent({ searchParams }: Pick<PageProps<"/stats">, "searchParams">) {
-  const [params] = await Promise.all([searchParams, getCurrentUser()]);
-  const includeArchived = parseIncludeArchived(params[INCLUDE_ARCHIVED_PARAM]);
+  const includeArchived = parseIncludeArchived((await searchParams)[INCLUDE_ARCHIVED_PARAM]);
   const stats = await getStats(includeArchived);
 
   return (
@@ -45,9 +44,7 @@ async function StatsContent({ searchParams }: Pick<PageProps<"/stats">, "searchP
       <IncludeArchivedToggle checked={includeArchived} />
       {stats.statusCounts.total === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
-          {includeArchived
-            ? "No applications to count yet."
-            : "No applications to count yet. Archived applications count only when included."}
+          No applications to count yet.
         </p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
@@ -59,7 +56,7 @@ async function StatsContent({ searchParams }: Pick<PageProps<"/stats">, "searchP
           </StatSection>
           <StatSection id="weekly" title={`Applications per week (last ${STATS_WEEKS} weeks)`} className="lg:col-span-2">
             <p className="text-sm text-muted-foreground">
-              By date applied, weeks starting Monday, from {formatDate(stats.weeks[0].weekStart)}.
+              By date applied, weeks starting Monday, from {formatDate(stats.fromDay)}.
             </p>
             <WeeklyChart weeks={stats.weeks} />
           </StatSection>
@@ -115,8 +112,8 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
               <span className="w-8 text-right tabular-nums">{applications}</span>
               <span aria-hidden className="flex-1">
                 <span
-                  className="block h-2 rounded-sm bg-chart-2"
-                  style={{ width: `${(applications / max) * 100}%` }}
+                  className="block h-2 rounded-sm"
+                  style={{ width: `${(applications / max) * 100}%`, backgroundColor: STATS_MARK_COLOR }}
                 />
               </span>
             </div>
@@ -149,16 +146,16 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
 }
 
 function ResponseRateTile({ rate }: { rate: ResponseRate }) {
-  const applied = STATUS_META.applied.label;
-  const screening = STATUS_META.screening.label;
+  const reachedLabel = STATUS_META[RESPONSE_RATE_FROM.reached].label;
+  const respondedLabel = STATUS_META[RESPONSE_RATE_FROM.responded].label;
   if (rate.percent === null) {
-    return <p className="text-sm text-muted-foreground">No applications have reached {applied} yet.</p>;
+    return <p className="text-sm text-muted-foreground">No applications have reached {reachedLabel} yet.</p>;
   }
   return (
     <div className="grid gap-1">
       <p className="text-4xl font-semibold tabular-nums">{rate.percent}%</p>
       <p className="text-sm text-muted-foreground">
-        {rate.responded} of {rate.reached} applications that reached {applied} got to {screening} or later.
+        {rate.responded} of {rate.reached} applications that reached {reachedLabel} got to {respondedLabel} or later.
       </p>
     </div>
   );

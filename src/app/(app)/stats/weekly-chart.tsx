@@ -5,10 +5,12 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatMonthDay } from "@/lib/dates";
-import type { WeekCount } from "@/lib/stats";
+import { STATS_WEEKS, type WeekCount } from "@/lib/stats";
+
+import { STATS_MARK_COLOR } from "./chart-color";
 
 const chartConfig = {
-  applications: { label: "Applications", color: "var(--chart-2)" },
+  applications: { label: "Applications", color: STATS_MARK_COLOR },
 } satisfies ChartConfig;
 
 /** A bar chart for sighted readers, with the same numbers in a table behind "Show as table". */
@@ -19,7 +21,7 @@ export function WeeklyChart({ weeks }: { weeks: WeekCount[] }) {
   return (
     <div className="grid gap-3">
       <p className="text-sm">
-        <span className="font-medium tabular-nums">{total}</span> applied in these {weeks.length} weeks.
+        <span className="font-medium tabular-nums">{total}</span> applications in the last {STATS_WEEKS} weeks.
       </p>
       <ChartContainer
         config={chartConfig}
@@ -27,10 +29,10 @@ export function WeeklyChart({ weeks }: { weeks: WeekCount[] }) {
         role="img"
         aria-label={`Bar chart of applications per week. ${total} in total; "Show as table" lists each week.`}
       >
-        <BarChart data={data} margin={{ top: 8, right: 4, left: -24, bottom: 0 }} accessibilityLayer={false}>
+        <BarChart data={data} accessibilityLayer={false}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={8} />
-          <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={48} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
           <ChartTooltip
             cursor={false}
             content={

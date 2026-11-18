@@ -357,28 +357,58 @@
 ## 2026-11-17: Launch step 8 (Stats dashboard, F9)
 **Status:** Done, pending owner review (branch `feat/stats`). One new migration, applied to the local stack only; nothing touched prod.
 **What was done**
-- Migration `20261118025658_create_stats_functions` (D13): four `language sql stable security invoker` functions with `set search_path = ''`, each filtering `user_id = (select auth.uid())` on top of RLS. Execute is revoked from public, anon and service_role and granted to authenticated only. No status value appears in the SQL, and nothing reads `now()` or `current_date`.
+- Migration `20261118025658_create_stats_functions` (D13) adds four `stable security invoker` functions with `set search_path = ''`. Each filters `user_id = (select auth.uid())`, with RLS on top. Execute is revoked from public, anon and service_role and granted to authenticated only. No status value appears in the SQL, and nothing reads `now()` or `current_date`.
   - `stats_status_counts(include_archived)`: applications per current status.
   - `stats_applied_per_day(from_day, until_day, include_archived)`: applications per `date_applied` in the half-open `[from_day, until_day)` window.
-  - `stats_response_counts(reached_statuses, responded_statuses, include_archived)`: applications whose history ever reached one of the first list, and how many of those ever reached one of the second. The lists come from `RESPONSE_RATE_STATUSES` in `status.ts`.
-  - `stats_stage_durations(include_archived)`: completed stays per status, using `lead(changed_at)` over each application's events ordered by `changed_at` (id breaks ties). Returns the stay count and average elapsed days.
-- `/stats` page with the nav link "Stats": an "Include archived applications" checkbox (`?archived=1`), Applications by status (a table of Active and Closed groups with counts, bars and a total), Response rate (percent plus "x of y"), Applications per week (a shadcn/Recharts bar chart in `--chart-2` with a text total, an `aria-label` and a "Show as table" table), and Average days in each stage (a table). The empty state replaces the sections when nothing is counted.
-- `src/lib/stats.ts` (pure): `statsWindow(today)`, `toStatusCounts`, `toWeekCounts`, `toResponseRate`, `toStageDurations`, `formatDays`, the `?archived` param helpers and `STATS_PATH`. `src/lib/stats-query.ts` (outside server-only) runs the four RPCs; `getStats(includeArchived)` in application-queries.ts passes `getToday()`.
-- `dates.ts`: `startOfWeek` (Monday) and `formatMonthDay`. `status.ts`: `forwardPathFrom` and `RESPONSE_RATE_STATUSES`.
+  - `stats_response_counts(reached_statuses, responded_statuses, include_archived)` (plpgsql): applications whose history ever reached a status in the first list, and how many of those ever reached one in the second. The lists come from `RESPONSE_RATE_STATUSES` in `status.ts`. More than 32 entries in either list raises `too_many_statuses` (22023).
+  - `stats_stage_durations(include_archived)`: completed stays per status, using `lead(changed_at)` over each application's events ordered by `changed_at`, with `id` breaking ties. Returns the stay count and the average elapsed days.
+- `/stats` page, with a "Stats" nav link:
+  - An "Include archived applications" checkbox (`?archived=1`).
+  - Applications by status: a table of the Active and Closed groups, with counts, bars and a total.
+  - Response rate: a percent plus "x of y".
+  - Applications per week: a shadcn/Recharts bar chart with a text total, an `aria-label` and a "Show as table" table.
+  - Average days in each stage: a table.
+  - With nothing to count, an empty state ("No applications to count yet.") replaces the sections.
+- `src/lib/stats.ts` holds the pure helpers: `statsWindow(today)`, `toStatusCounts`, `toWeekCounts`, `toResponseRate`, `toStageDurations`, `formatDays`, the `?archived` param helpers and `STATS_PATH`. `src/lib/stats-query.ts` (outside server-only) runs the four RPCs and maps their rows to camelCase. `getStats(includeArchived)` in application-queries.ts passes in `getToday()`.
+- `dates.ts`: `startOfWeek` (Monday) and `formatMonthDay`, plus a private `utcDate` that the date-only helpers share. `status.ts`: `forwardPathFrom`, `RESPONSE_RATE_FROM` (the two starting statuses) and `RESPONSE_RATE_STATUSES` built from them. The page's response-rate labels also come from `RESPONSE_RATE_FROM`.
+- Stats marks take one colour, `STATS_MARK_COLOR` (`var(--chart-2)`) in `stats/chart-color.ts`.
 - `revalidateApplicationLists()` now also revalidates `/stats`.
-- shadcn `chart` added (adds `recharts` 3.8; repo recharts/recharts, maintainers checked).
-**Files:** `supabase/migrations/20261118025658_create_stats_functions.sql`, `src/types/database.types.ts`, `src/app/(app)/stats/{page.tsx,weekly-chart.tsx,include-archived-toggle.tsx}`, `src/app/(app)/layout.tsx`, `src/components/ui/chart.tsx`, `src/lib/{stats,stats-query,dates,status,revalidate,application-queries}.ts`, unit tests beside them, `tests/rls/stats-query.test.ts`, `tests/e2e/stats.spec.ts`, `tests/e2e/support/local-env.ts`, `package.json`, `package-lock.json`, `.claude/rules/{database,server-actions,ui,testing}.md`, `docs/learnings.md`
+- shadcn `chart` added. It brings in `recharts` 3.8 (repo recharts/recharts; maintainers checked). `react-is` is pinned to 19.3.0 to match React, because the hoisted 16.x that recharts would otherwise use doesn't recognise React 19 elements.
+- E2E fixture fix: `signInAs` now waits until the browser's zone is saved and the network is idle. Detection's late re-render made the step 5 rollback e2e fail every time when run alone, on `main` too (see learnings).
+**Files:** `supabase/migrations/20261118025658_create_stats_functions.sql`, `src/types/database.types.ts`, `src/app/(app)/stats/{page.tsx,weekly-chart.tsx,include-archived-toggle.tsx,chart-color.ts}`, `src/app/(app)/layout.tsx`, `src/components/ui/chart.tsx`, `src/lib/{stats,stats-query,dates,status,revalidate,application-queries}.ts`, unit tests beside them, `tests/rls/stats-query.test.ts`, `tests/e2e/stats.spec.ts`, `tests/e2e/support/{local-env,fixtures}.ts`, `package.json`, `package-lock.json`, `.claude/rules/{database,server-actions,ui,testing}.md`, `docs/learnings.md`
 **Tests**
-- Unit: `startOfWeek` (Sunday, Monday, year and leap boundaries), `formatMonthDay`, `statsWindow` (12 weeks, half-open, Sunday/Monday edges, a year boundary, and the same instant falling in different weeks in Pago Pago and Kiritimati), week binning (edges in, outside days ignored), status counts, response rate rounding and the no-data case, stage durations, `formatDays`, `forwardPathFrom`, the response-rate sets.
-- Local stack (`tests/rls/stats-query.test.ts`, runs the real `selectStats`): backdated status events give exact stage averages; archived excluded and included; window edges; another user sees all zeros and their own rows never reach the owner's stats; anon gets 42501 from all four functions.
-- E2E `tests/e2e/stats.spec.ts`: at 375px with seeded fake data and backdated events, the counts, 50% response rate, weekly totals and table, and "Applied 4 days 2" show. The archived toggle changes the numbers, survives a reload and turns off. No horizontal scroll, no console errors or warnings. A second user sees the empty state on both toggle settings. 6 repeats serially, no flakes after the fix in learnings.
-**Checks:** `npx supabase db reset` clean; typecheck, lint, `npm test` (190), build with the CI placeholder env, `npm run test:e2e` (20/20), `npm run test:rls` (40/40, on its own). Local advisors: only the expected `unused_index` INFO; `db lint --schema public,private`: no errors. Screenshots checked at 375px and 1280px, light and with `.dark` on `<html>`.
+- Unit, dates: `startOfWeek` (Sunday, Monday, year and leap boundaries) and `formatMonthDay`.
+- Unit, window: `statsWindow` covers 12 weeks, half-open, with Sunday and Monday edges and a year boundary. The same instant falls in different weeks in Pago Pago and Kiritimati.
+- Unit, aggregation: week binning (edge days in, outside days ignored), status counts, stage durations.
+- Unit, formatting: response-rate rounding, 199 of 200 shows 99% (never 100% unless all responded), the no-data case; `formatDays`, including "<0.1 days".
+- Unit, status: `forwardPathFrom`, `RESPONSE_RATE_FROM` and the response-rate sets.
+- Local stack (`tests/rls/stats-query.test.ts`, 7 tests running the real `selectStats` with three fake users). Each event is backdated as it's logged (the newest event after each insert or update):
+  - exact stage averages, with archived excluded and included, and the window edges;
+  - a re-entered stage: Applied → Screening → Applied → Screening → Rejected gives Applied 2 stays averaging 2.5 days and Screening 2 averaging 1 day, and the application counts once in the response rate (1 of 1);
+  - another user calling all four RPCs directly with the widest arguments (every status, `-infinity` to `infinity`, archived included) gets empty or zero results;
+  - another user sees all zeros, and their own rows never reach the owner's stats;
+  - the 32-status cap: 33 in either list fails with 22023, and 32 works;
+  - anon gets 42501 from all four functions.
+- E2E `tests/e2e/stats.spec.ts`, at 375px with seeded fake data and backdated events:
+  - the counts, the 50% response rate, the weekly total and table, and "Applied 4 days 2" show;
+  - the archived toggle changes the numbers, survives a reload and turns back off;
+  - no horizontal scroll, and no console errors or warnings;
+  - a second user sees the empty state with the toggle off and on.
+**Checks** (final code, with nothing else using the local stack)
+- `npx supabase db reset`: clean. `npm run db:types`: no change from the first version, since the function signatures are unchanged.
+- Local advisors: only the expected `unused_index` INFO. `db lint --schema public,private`: no errors.
+- typecheck, lint, `npm test` (192) and the build with the CI placeholder env all pass.
+- `npm run test:rls`, 3 serial runs: 43/43 each time.
+- `npm run test:e2e`, 3 serial runs: 20/20 each time, after the `signInAs` fix. Before that fix, the first run failed the step 5 rollback test, which also failed every single run on `main`. On the final code, `stats.spec.ts` passed 6 serial repeats of each test (12 runs). After the fix, the rollback test passed 3 single runs and 5 repeats.
+- Screenshots checked at 375px and 1280px, light and dark (`.dark` on `<html>`), on the first version.
+**Reviews:** security reviewer SAFE (live probes with attacker arguments; anon refused with 401/42501; no leaks). Verification met every F9 criterion. Five code-quality passes; their findings are applied in the second commit.
 **Decisions / defaults** (PRD silent)
 - Weeks start on Monday (ISO). "Last 12 weeks" is the current week plus the 11 before it, by `date_applied` in any status; a future `date_applied` in the current week counts.
-- Response rate goes by status history along the forward path: "reached Applied" means the application ever had Applied or a later forward stage (Screening, Interviewing, Offer, Accepted); "responded" means Screening or later. Rejected, Withdrawn and Ghosted aren't on the path, so an Applied → Rejected application counts as reached but not responded. Shown as a whole percent.
-- Average days per stage counts completed stays only (entering a status until the next change), as elapsed time (seconds / 86400), rounded to 0.1 day. A stage re-entered counts as another stay. The current stage isn't included; the page says so.
+- Response rate goes by status history along the forward path. "Reached Applied" means the application was ever Applied or at a later forward stage (Screening, Interviewing, Offer, Accepted); "responded" means Screening or later. Rejected, Withdrawn and Ghosted aren't on the path, so an Applied → Rejected application counts as reached but not responded (the PRD read literally; flagged for the owner). History is permanent (D5), so a mis-drag to Screening still counts as responded. Shown as a whole percent, capped at 99% until every application has responded.
+- Average days per stage counts completed stays only (entering a status until the next change), as elapsed time (seconds / 86400), rounded to 0.1 day. An average above 0 that rounds to 0 shows "<0.1 days". A re-entered stage counts as another stay. The current stage isn't included, and the page says so.
 - Status counts use each application's current status. All stats exclude archived applications unless the toggle is on (F9).
 - One query per stat, all from SQL functions (no views): each needs parameters (the window, the toggle, the status lists).
 **Follow-ups**
-- Step 9: push this migration to prod with the other eight (owner approval; security review of the SQL first).
-- The design pass after this step can restyle the page; the response-rate tile leaves empty space at desktop width.
+- Step 9: push this migration to prod with the other eight (owner approval). After the push, check `proacl` on prod for the four `stats_*` functions: execute for authenticated only, none for anon or service_role.
+- Design pass: the response-rate tile leaves empty space at desktop width.
+- Not a concern now: PostgREST's 1000-row cap. The per-day query returns at most 84 rows, and the others return one row per status.

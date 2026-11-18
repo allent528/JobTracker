@@ -1,20 +1,29 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { Status } from "@/lib/status";
+import { STATUSES, type Status } from "@/lib/status";
 import { selectStats } from "@/lib/stats-query";
 
 import { type Client, localSuperuserQuery, newClient, recreateUser, rowOrThrow, signedInClient } from "./support";
 
-// Its own fake users, so this file never shares rows with the other local-stack files.
 const OWNER = "rls-stats-a@example.com";
 const OTHER = "rls-stats-b@example.com";
+const REENTRY = "rls-stats-c@example.com";
 const TODAY = "2026-11-17"; // a Tuesday; its week starts 2026-11-16
 const DENIED = "42501";
+const INVALID_PARAMETER = "22023";
 
 let owner: Client;
 let other: Client;
+let reentry: Client;
 
-/** Inserts an application, walks it through `statuses` and pins each event to `start + days`. */
+/** Pins the application's newest status event to 2026-01-01 plus `day` days. */
+function backdateNewestEvent(applicationId: string, day: number) {
+  localSuperuserQuery(
+    `update public.status_events set changed_at = timestamptz '2026-01-01 00:00:00+00' + interval '${day} days' where id = (select id from public.status_events where application_id = '${applicationId}' order by changed_at desc limit 1)`,
+  );
+}
+
+/** Inserts an application and walks it through `path`, backdating each event as it's logged. */
 async function seed(
   client: Client,
   row: { company: string; date_applied?: string },
@@ -28,22 +37,17 @@ async function seed(
       .select("id")
       .single(),
   );
+  backdateNewestEvent(id, first.day);
   for (const step of rest) {
     rowOrThrow(await client.from("applications").update({ status: step.status }).eq("id", id).select("id"));
-  }
-  for (const step of path) {
-    localSuperuserQuery(
-      `update public.status_events set changed_at = timestamptz '2026-01-01 00:00:00+00' + interval '${step.day} days' where application_id = '${id}' and to_status = '${step.status}'`,
-    );
+    backdateNewestEvent(id, step.day);
   }
   return id;
 }
 
 beforeAll(async () => {
-  await recreateUser(OWNER);
-  await recreateUser(OTHER);
-  owner = await signedInClient(OWNER);
-  other = await signedInClient(OTHER);
+  for (const email of [OWNER, OTHER, REENTRY]) await recreateUser(email);
+  [owner, other, reentry] = await Promise.all([OWNER, OTHER, REENTRY].map(signedInClient));
 
   await seed(owner, { company: "Acme Corp", date_applied: "2026-11-16" }, [
     { status: "saved", day: 0 },
@@ -55,7 +59,6 @@ beforeAll(async () => {
     { status: "applied", day: 0 },
     { status: "ghosted", day: 10 },
   ]);
-  // Saved with a date applied in the week after the window: never counted per week.
   await seed(owner, { company: "Initech", date_applied: "2026-11-23" }, [{ status: "saved", day: 0 }]);
   const archived = await seed(owner, { company: "Umbrella", date_applied: "2026-11-17" }, [
     { status: "applied", day: 0 },
@@ -67,6 +70,23 @@ beforeAll(async () => {
 });
 
 describe("stats functions (F9)", () => {
+  it("return nothing to another user calling them directly with the widest arguments", async () => {
+    const [statusCounts, perDay, response, durations] = await Promise.all([
+      other.rpc("stats_status_counts", { include_archived: true }),
+      other.rpc("stats_applied_per_day", { from_day: "-infinity", until_day: "infinity", include_archived: true }),
+      other.rpc("stats_response_counts", {
+        reached_statuses: [...STATUSES],
+        responded_statuses: [...STATUSES],
+        include_archived: true,
+      }),
+      other.rpc("stats_stage_durations", { include_archived: true }),
+    ]);
+    expect(statusCounts).toMatchObject({ error: null, data: [] });
+    expect(perDay).toMatchObject({ error: null, data: [] });
+    expect(response).toMatchObject({ error: null, data: [{ reached: 0, responded: 0 }] });
+    expect(durations).toMatchObject({ error: null, data: [] });
+  });
+
   it("count the owner's unarchived applications", async () => {
     const stats = await selectStats(owner, { today: TODAY, includeArchived: false });
 
@@ -75,19 +95,18 @@ describe("stats functions (F9)", () => {
     expect(stats.statusCounts.total).toBe(3);
     expect([count("saved"), count("rejected"), count("ghosted"), count("screening")]).toEqual([1, 1, 1, 0]);
 
+    expect(stats.fromDay).toBe("2026-08-31");
     expect(stats.weeks).toHaveLength(12);
     expect(stats.weeks[0]).toEqual({ weekStart: "2026-08-31", applications: 1 });
     expect(stats.weeks[11]).toEqual({ weekStart: "2026-11-16", applications: 1 });
     expect(stats.weeks.reduce((sum, w) => sum + w.applications, 0)).toBe(2);
 
-    // Acme reached Screening; Globex went Applied → Ghosted; Initech never reached Applied.
     expect(stats.responseRate).toEqual({ reached: 2, responded: 1, percent: 50 });
 
     const duration = (status: Status) => stats.stageDurations.find((d) => d.status === status);
     expect(duration("saved")).toEqual({ status: "saved", stays: 1, averageDays: 2 });
-    expect(duration("applied")).toEqual({ status: "applied", stays: 2, averageDays: 6.5 }); // 3 and 10 days
+    expect(duration("applied")).toEqual({ status: "applied", stays: 2, averageDays: 6.5 });
     expect(duration("screening")).toEqual({ status: "screening", stays: 1, averageDays: 1 });
-    // Current stages (Rejected, Ghosted, Initech's Saved) have no end yet.
     expect(duration("rejected")).toEqual({ status: "rejected", stays: 0, averageDays: null });
   });
 
@@ -102,6 +121,21 @@ describe("stats functions (F9)", () => {
     expect(applied?.averageDays).toBeCloseTo(17 / 3);
   });
 
+  it("count each stay in a re-entered stage, and the application once in the response rate", async () => {
+    await seed(reentry, { company: "Vandelay Industries", date_applied: "2026-06-01" }, [
+      { status: "applied", day: 0 },
+      { status: "screening", day: 2 },
+      { status: "applied", day: 3 },
+      { status: "screening", day: 6 },
+      { status: "rejected", day: 7 },
+    ]);
+    const stats = await selectStats(reentry, { today: TODAY, includeArchived: false });
+    const duration = (status: Status) => stats.stageDurations.find((d) => d.status === status);
+    expect(duration("applied")).toEqual({ status: "applied", stays: 2, averageDays: 2.5 });
+    expect(duration("screening")).toEqual({ status: "screening", stays: 2, averageDays: 1 });
+    expect(stats.responseRate).toEqual({ reached: 1, responded: 1, percent: 100 });
+  });
+
   it("never count another user's applications", async () => {
     for (const includeArchived of [false, true]) {
       const stats = await selectStats(other, { today: TODAY, includeArchived });
@@ -111,7 +145,6 @@ describe("stats functions (F9)", () => {
       expect(stats.stageDurations.every((d) => d.stays === 0)).toBe(true);
     }
 
-    // The other user's own rows don't leak into the owner's stats either.
     await seed(other, { company: "Hooli", date_applied: "2026-11-17" }, [
       { status: "applied", day: 0 },
       { status: "offer", day: 1 },
@@ -122,6 +155,28 @@ describe("stats functions (F9)", () => {
     const owners = await selectStats(owner, { today: TODAY, includeArchived: false });
     expect(owners.statusCounts.total).toBe(3);
     expect(owners.responseRate).toEqual({ reached: 2, responded: 1, percent: 50 });
+  });
+
+  it("reject more than 32 statuses in either list", async () => {
+    const statuses = (n: number) => Array.from({ length: n }, (_, i) => `status_${i}`);
+    for (const [reached, responded] of [
+      [statuses(33), []],
+      [[], statuses(33)],
+    ]) {
+      const result = await owner.rpc("stats_response_counts", {
+        reached_statuses: reached,
+        responded_statuses: responded,
+        include_archived: false,
+      });
+      expect(result.error?.code).toBe(INVALID_PARAMETER);
+      expect(result.data).toBeNull();
+    }
+    const atLimit = await owner.rpc("stats_response_counts", {
+      reached_statuses: statuses(32),
+      responded_statuses: statuses(32),
+      include_archived: false,
+    });
+    expect(atLimit).toMatchObject({ error: null, data: [{ reached: 0, responded: 0 }] });
   });
 
   it("are not callable signed out", async () => {

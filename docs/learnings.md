@@ -160,7 +160,13 @@
 - **Lesson:** Validate zones by "Intl can format in it" plus a name shape, not by membership in `supportedValuesOf`.
 
 ## 2026-11-17: A full page load can show a hidden duplicate of streamed content
-- **Mistake:** The stats isolation e2e failed about one run in six with a strict-mode violation: `getByText("No applications to count yet.")` matched two paragraphs, one hidden, right after `page.goto`.
-- **Root cause:** Not only the Activity-kept routes (2026-11-14 entry): while a Suspense boundary streams in, the DOM can briefly hold a hidden copy of the content. `getByText` doesn't skip hidden elements.
+- **Mistake:** The stats isolation e2e failed about one run in six with a strict-mode violation. Right after `page.goto`, `getByText("No applications to count yet.")` matched two paragraphs, one of them hidden.
+- **Root cause:** Hidden copies don't only come from the routes Activity keeps mounted (2026-11-14 entry). While a Suspense boundary streams in, the DOM can briefly hold a hidden copy of the content, and `getByText` doesn't skip hidden elements.
 - **Fix:** `getByText(message, { exact: true }).filter({ visible: true })`. Found with `--repeat-each=6 --workers=1`.
-- **Lesson:** In e2e, every text or label locator for streamed content gets `.filter({ visible: true })` (role locators already skip hidden elements). Repeat a new spec serially before calling it stable.
+- **Lesson:** Text and label locators on streamed content need `.filter({ visible: true })`; role locators already skip hidden elements. Repeat a new spec serially before calling it stable.
+
+## 2026-11-17: Time zone detection re-rendered the board in the middle of a test
+- **Mistake:** The pipeline rollback e2e (step 5) failed every time when run alone, on `main` too, but passed inside the full suite. The open Move menu was detached and its card ("Gone Co", already deleted in the database) vanished from the board.
+- **Root cause:** `signInAs` clears `profiles.time_zone`, so the first signed-in page runs `detectTimeZone`, which revalidates every page. On a cold dev server that action finished after the test had moved on, and the refresh re-rendered the board from the database.
+- **Fix:** `signInAs` now waits until the zone is saved and the network is idle before returning.
+- **Lesson:** A fixture that triggers background work (detection, revalidation) waits for it to finish. Run a failing e2e on its own and on `main` before calling it a flake.

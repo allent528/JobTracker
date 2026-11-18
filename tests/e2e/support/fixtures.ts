@@ -30,6 +30,16 @@ export const test = base.extend<Fixtures>({
       await target.goto(`/auth/confirm?${params}`);
       await expect(target).toHaveURL("/");
       await expect(target.getByRole("heading", { level: 1, name: "Reminders" })).toBeVisible();
+
+      // The page saves the browser's zone and then re-renders every page. Wait for both, so that
+      // re-render can't land in the middle of the test (it once closed an open board menu).
+      await expect
+        .poll(async () => {
+          const { data } = await admin.from("profiles").select("time_zone").eq("id", user.id).single();
+          return data?.time_zone ?? null;
+        })
+        .not.toBeNull();
+      await target.waitForLoadState("networkidle");
     });
   },
 });
