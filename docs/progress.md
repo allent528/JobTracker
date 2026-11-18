@@ -413,11 +413,11 @@
 - Design pass: the response-rate tile leaves empty space at desktop width.
 - Not a concern now: PostgREST's 1000-row cap. The per-day query returns at most 84 rows, and the others return one row per status.
 
-## 2026-11-18: Launch step 9: deploy prep — waiting for owner
+## 2026-11-18: Launch step 9: deploy prep, waiting for owner
 **Status:** Partial. Runbook and config ready (branch `chore/deploy-prep`); nothing has touched prod. No `supabase link`, `db push`, MCP, Vercel CLI or dashboard change was made.
 **What was done**
 - `docs/deploy.md`: the ordered runbook. (A) owner dashboard steps: wake the project, reset the DB password, Auth settings (sign-ups off, OTP 6 / 900 s, Magic Link template text, rate limits, SMTP decision), Data API schemas, add the owner user, Vercel import (Node 22, `npm ci`, the two `NEXT_PUBLIC_*` vars for Production only, production branch `main`, previews off via Ignored Build Step, no analytics), Site URL and redirect URLs. (B) the CLI steps Claude runs only after each approval, with all 9 migrations listed in apply order. (C) a phone and desktop smoke test. (D) rollback. (E) the paused-project note.
-- `package.json`: `engines.node` = `22.x` (matches CI; `@supabase/supabase-js` needs Node 22+, and Vercel honours it over its dashboard default). Mirrored into the root entry of `package-lock.json` by hand (a lockfile-only `npm install` also rewrote unrelated bundled entries, so that was reverted).
+- `package.json`: `engines.node` = `22.x` (matches CI; `@supabase/supabase-js` needs Node 22+, and Vercel honors it over its dashboard default). Mirrored into the root entry of `package-lock.json` by hand (a lockfile-only `npm install` also rewrote unrelated bundled entries, so that was reverted).
 - `prepare` now runs `scripts/install-hooks.mjs`, which sets `core.hooksPath` only inside a git checkout. The old inline `git config` would fail `npm ci` on a build machine with no `.git` folder.
 - Supabase CLI 3.1 targets the **local** database unless a command gets `--remote` (checked with `--help`; hosted changes also need `--yes`). The `db-migration` skill said `db push --yes`, which would now push to local; fixed to `db push --remote --skip-vault --yes` and the advisors step to `db advisors --remote`. `.claude/rules/database.md` notes the `--remote` default and never to run `supabase config push`.
 **Files:** `docs/deploy.md`, `docs/progress.md`, `docs/learnings.md`, `package.json`, `package-lock.json`, `scripts/install-hooks.mjs`, `.claude/skills/db-migration/SKILL.md`, `.claude/rules/database.md`

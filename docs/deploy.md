@@ -38,7 +38,7 @@ The migrations go in before the first Vercel deploy so the app never runs agains
 - **Verify:** the project home shows it as active, and Table Editor opens.
 
 ### A2. Reset the database password
-Open since step 1. The CLI needs this password for `db push` and `migration list` in part B.
+An owner to-do since step 1. Part B's `db push` and `migration list` may ask for this password (the login token from B1 may be enough; if the CLI doesn't ask, nothing more is needed).
 - [ ] **Do:** Project Settings → Database → **Reset database password**. Generate a long random one and save it in your password manager. Don't paste it into chat, a file in the repo, or a commit.
 - **Verify:** the password manager entry exists; the dashboard shows no error.
 
@@ -106,20 +106,22 @@ Don't run `npx supabase config push`: it would copy the local settings (`site_ur
   - **Site URL** = `<prod-url>` (for example `https://jobtracker-xyz.vercel.app`, no trailing slash).
   - **Redirect URLs**: add `<prod-url>/**`. Remove any `localhost` entries; prod should never send users to localhost.
 - **Verify:** in part C, the link in the sign-in email starts with `<prod-url>/auth/confirm`.
-- If you later add a custom domain, update both values and redeploy nothing (these are Supabase-side).
+- If you later add a custom domain, update both values; no redeploy is needed, since they live in Supabase.
 
 ---
 
 ## B. Claude: CLI steps (each needs the owner's "go")
 
-Supabase CLI 3.x (the version in `package.json`) targets the **local** stack unless a command gets `--remote`. Every prod command below has `--remote`; every one without it is local. Changes to a hosted project also need `--yes`.
+Supabase CLI 3.x (the version in `package.json`) targets the **local** stack unless a command gets `--remote`. Every prod command below has `--remote`; every database command without it is local. Changes to a hosted project also need `--yes`. `db push` also gets `--skip-vault`: the project has no Vault secrets configured, and the flag guards against a push ever sending any.
 
 Run these from the main checkout (`C:/Users/ariac/Repos/JobTracker`, on an up-to-date `main`), not a worktree: `link` saves the project ref in that folder's `supabase/.temp/` (git-ignored).
 
 **Password handling:** commands marked "needs the DB password" use the password from A2. Before starting Claude Code for part B, set it in that PowerShell window so it never appears in chat or history:
 ```powershell
-$env:SUPABASE_DB_PASSWORD = Read-Host "Supabase DB password"
+$env:SUPABASE_DB_PASSWORD = [Net.NetworkCredential]::new('', (Read-Host -AsSecureString 'Supabase DB password')).Password
 ```
+The typed password isn't shown or saved in history. Claude never prints the environment (no `env`, `set` or `echo` of it). After B6, clear it: `Remove-Item Env:SUPABASE_DB_PASSWORD` (or close that window).
+
 Or run those commands yourself in your own terminal and paste the output (it contains no secrets).
 
 ### B1. Log in (owner)
@@ -186,10 +188,14 @@ npx supabase db query --remote --read-only "select tablename, cmd, count(*) from
 # Table privileges for client roles (expect no anon rows; status_events: authenticated SELECT only, nothing for service_role)
 npx supabase db query --remote --read-only "select table_name, grantee, privilege_type from information_schema.role_table_grants where table_schema = 'public' and grantee in ('anon', 'authenticated', 'service_role') order by 1, 2, 3"
 
+# Column-level insert/update grants (content columns only; compare with local)
+npx supabase db query --remote --read-only "select table_name, column_name, grantee, privilege_type from information_schema.column_privileges where table_schema = 'public' and grantee in ('anon', 'authenticated') and privilege_type in ('INSERT', 'UPDATE') order by 1, 2, 3, 4"
+
 # Function ACLs (step 8 follow-up). Expect each stats_* proacl to list only postgres and authenticated:
 # no anon=, no service_role=, and no entry starting with "=X" (that would be PUBLIC).
 # private.* functions: no anon, authenticated or PUBLIC entries.
-npx supabase db query --remote --read-only "select n.nspname, p.proname, p.proacl::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'private') order by 1, 2"
+# Expect no NULL: a NULL proacl means the default, which lets PUBLIC execute.
+npx supabase db query --remote --read-only "select n.nspname, p.proname, coalesce(p.proacl::text, 'NULL = PUBLIC execute') as acl from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname in ('public', 'private') order by 1, 2"
 
 # Signup trigger present (expect on_auth_user_created)
 npx supabase db query --remote --read-only "select tgname from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal"
@@ -200,9 +206,10 @@ npx supabase db query --remote --read-only "select count(*) as profiles, count(t
 - No RLS test suite, e2e or seed runs against prod (testing rule). These catalog queries read no user data.
 
 ### B7. Type drift (same approval as B5; read-only)
+Run in Git Bash (Claude's Bash tool):
 ```bash
-npx supabase gen types typescript --remote --schema public > "$TMP/prod.database.types.ts"
-git diff --no-index --stat src/types/database.types.ts "$TMP/prod.database.types.ts"
+npx supabase gen types typescript --remote --schema public > "${TMP:-/tmp}/prod.database.types.ts"
+git diff --no-index --stat src/types/database.types.ts "${TMP:-/tmp}/prod.database.types.ts"
 ```
 - **Expect:** no differences. Any difference means prod's schema isn't what the app was built against: stop and investigate. Never overwrite `src/types/database.types.ts` from prod (it's generated from local).
 
@@ -279,5 +286,6 @@ Free Supabase projects pause after about a week without activity.
 - **Lockfile:** includes the Linux x64 binaries (next-swc, lightningcss, tailwind oxide) since step 1, and pins `react-is` to 19.3.0 for recharts. `npm ci` installs exactly that.
 - **`next.config.ts`:** `cacheComponents` and `partialPrefetching` are standard Next 16 features that Vercel supports. `logging.serverFunctions: false` only affects the dev terminal; production doesn't log Server Function arguments either way. The Turbopack CSS rule is what CI's `next build` already uses.
 - **Fonts:** none to download. The app uses system font stacks (`globals.css`), so the build makes no font requests.
+- **Pending design pass (PR #9, awaiting owner review):** it adds a self-hosted OFL font and dark mode that follows the OS setting. If PR #9 merges first, update the Fonts line above and the dark-mode decision in `docs/progress.md` to match.
 - **Env:** the app reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`src/lib/supabase/env.ts`). There's no hard-coded localhost and no `emailRedirectTo`; the magic link comes from the Site URL (A7).
 - **Build without secrets:** `next build` passes with the CI placeholder env, so it reaches no database at build time.
