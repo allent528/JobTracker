@@ -412,3 +412,39 @@
 - Step 9: push this migration to prod with the other eight (owner approval). After the push, check `proacl` on prod for the four `stats_*` functions: execute for authenticated only, none for anon or service_role.
 - Design pass: the response-rate tile leaves empty space at desktop width.
 - Not a concern now: PostgREST's 1000-row cap. The per-day query returns at most 84 rows, and the others return one row per status.
+
+## 2026-11-18: Launch step 9: deploy prep — waiting for owner
+**Status:** Partial. Runbook and config ready (branch `chore/deploy-prep`); nothing has touched prod. No `supabase link`, `db push`, MCP, Vercel CLI or dashboard change was made.
+**What was done**
+- `docs/deploy.md`: the ordered runbook. (A) owner dashboard steps: wake the project, reset the DB password, Auth settings (sign-ups off, OTP 6 / 900 s, Magic Link template text, rate limits, SMTP decision), Data API schemas, add the owner user, Vercel import (Node 22, `npm ci`, the two `NEXT_PUBLIC_*` vars for Production only, production branch `main`, previews off via Ignored Build Step, no analytics), Site URL and redirect URLs. (B) the CLI steps Claude runs only after each approval, with all 9 migrations listed in apply order. (C) a phone and desktop smoke test. (D) rollback. (E) the paused-project note.
+- `package.json`: `engines.node` = `22.x` (matches CI; `@supabase/supabase-js` needs Node 22+, and Vercel honours it over its dashboard default). Mirrored into the root entry of `package-lock.json` by hand (a lockfile-only `npm install` also rewrote unrelated bundled entries, so that was reverted).
+- `prepare` now runs `scripts/install-hooks.mjs`, which sets `core.hooksPath` only inside a git checkout. The old inline `git config` would fail `npm ci` on a build machine with no `.git` folder.
+- Supabase CLI 3.1 targets the **local** database unless a command gets `--remote` (checked with `--help`; hosted changes also need `--yes`). The `db-migration` skill said `db push --yes`, which would now push to local; fixed to `db push --remote --skip-vault --yes` and the advisors step to `db advisors --remote`. `.claude/rules/database.md` notes the `--remote` default and never to run `supabase config push`.
+**Files:** `docs/deploy.md`, `docs/progress.md`, `docs/learnings.md`, `package.json`, `package-lock.json`, `scripts/install-hooks.mjs`, `.claude/skills/db-migration/SKILL.md`, `.claude/rules/database.md`
+**Checks:** typecheck, lint, `npm test`, build with the CI placeholder env (no local stack used; results in the PR).
+**Deploy-readiness review (no prod access):** `next.config.ts` (`cacheComponents`, `partialPrefetching`, Turbopack CSS rule) needs nothing Vercel-specific; `logging.serverFunctions: false` only affects dev output. No web fonts to fetch (system stacks). `react-is` 19.3.0 pin and the Linux binaries are in the lockfile. The app reads only the two public env vars; no hard-coded localhost or `emailRedirectTo`.
+**Approval gates (each needs the owner's explicit OK, in order)**
+1. `npx supabase link --project-ref skcsrdyqsqkinrrwtdyh` (after the owner runs `npx supabase login`).
+2. Read-only pre-push checks and `db push --remote --skip-vault --dry-run`.
+3. `db push --remote --skip-vault --yes` (the 9 migrations).
+4. Read-only prod checks: advisors, lint, RLS/grant/`proacl` queries, type drift.
+**Owner to-dos (dashboards; see docs/deploy.md part A)**
+- Merge this PR; restore the project if paused; reset the DB password.
+- Auth: sign-ups off; OTP length 6 and expiry 900 s; Magic Link template (subject + body in deploy.md A3); check rate limits; decide on custom SMTP (the built-in sender only delivers to Supabase org members and about 2 emails an hour).
+- Data API exposes only `public` and `graphql_public`.
+- After the push: add your user, auto-confirmed.
+- Vercel: import, env vars (Production only), deploy, production branch `main`, previews off, analytics off; optionally match the function region to Supabase's.
+- Site URL = the prod URL; redirect URLs `<prod-url>/**`; no localhost entries.
+- Run the smoke test (deploy.md part C).
+**Open owner decisions**
+- Follow-ups on applications in a closed status still show on the home page (step 7 default). Keep or hide?
+- Stats: Applied → Rejected counts as reached but not responded (step 8 default, the PRD read literally). Should a rejection count as a response?
+- Dark mode: the dark theme exists (`.dark` styles) but nothing turns it on, so prod is always light. Add a toggle, follow the system setting, or stay light-only?
+- Custom SMTP now or later.
+- Read-only Supabase MCP (`.mcp.json` still has write features pointing at prod), open since step 1.
+- Before launch per the step 1 decision: add Firefox/WebKit to Playwright, or launch on Chromium-only e2e?
+- Keep-alive for the paused-project issue (use weekly, upgrade, or a scheduled ping), default: none.
+**Follow-ups (unchanged, not blocking launch)**
+- Reject Intl-unsupported time-zone names (such as `Factory`) in the database in the next migration; the app already falls back to UTC.
+- Atomic interview + links RPC; shared form pieces; response-rate tile layout at desktop width.
+- After the push, record advisor results, `proacl` for the four `stats_*` functions and type drift here.

@@ -51,7 +51,7 @@ Any change here follows the `db-migration` skill.
 - The `stats_*` functions (`20261118025658_create_stats_functions`) are `stable security invoker` with `set search_path = ''`, and each filters `user_id = (select auth.uid())` itself. Execute is revoked from public, anon and service_role and granted to authenticated only.
 - They return raw facts. Status lists arrive as `text[]` parameters from `src/lib/status.ts` (capped at 32 entries, `too_many_statuses` / 22023), and days arrive as `date` parameters.
 - Never hard-code statuses in them, and never read `now()` or `current_date` (those are UTC, not the owner's day).
-- Develop against the local stack: `npx supabase db reset` must apply every migration cleanly before anything goes to prod. Push to the single hosted project (JobTracker (`skcsrdyqsqkinrrwtdyh`)) only with the owner's OK. Regenerate types from local.
+- Develop against the local stack: `npx supabase db reset` must apply every migration cleanly before anything goes to prod. Push to the single hosted project (JobTracker (`skcsrdyqsqkinrrwtdyh`)) only with the owner's OK. Regenerate types from local. Supabase CLI 3.x commands (`db push`, `db query`, `db advisors`, `migration list`, `gen types`) hit the local stack unless given `--remote`; only prod steps in `docs/deploy.md` pass it. Never run `supabase config push` (it would copy the local auth settings to prod).
 
 ## Storage policies
 - Buckets are private unless a file is truly public. Object paths encode ownership (e.g. `<record_id>/<type>/<file>`); policies parse the path with a strict helper and check the *current* relationship.
