@@ -10,6 +10,7 @@ const OWNER = "rls-reminders@example.com";
 const OTHER = "rls-reminders-other@example.com";
 
 const LAST_DAY = "2026-12-08";
+const UNTIL_DAY = "2026-12-09";
 
 let ownerId: string;
 let otherId: string;
@@ -47,12 +48,12 @@ describe("due follow-ups query (F8)", () => {
     const lastDay = await application(owner, "Acme Corp", { next_follow_up_on: LAST_DAY });
     const overdue = await application(owner, "Globex", { next_follow_up_on: "2025-06-01" });
     const closed = await application(owner, "Initech", { next_follow_up_on: "2026-12-02", status: "rejected" });
-    await application(owner, "Umbrella", { next_follow_up_on: "2026-12-09" }); // after the last day
+    await application(owner, "Umbrella", { next_follow_up_on: UNTIL_DAY }); // `untilDay` is exclusive
     await application(owner, "Hooli", { next_follow_up_on: "2026-12-01", archived: true });
-    await application(owner, "Vandelay"); // no follow-up
+    await application(owner, "Vandelay");
     await application(other, "Wonka", { next_follow_up_on: "2026-12-01" });
 
-    const { data, error } = await selectDueFollowUps(owner, ownerId, LAST_DAY);
+    const { data, error } = await selectDueFollowUps(owner, ownerId, UNTIL_DAY);
     expect(error).toBeNull();
     const rows = toDueFollowUps(data ?? []);
     expect(rows.map((row) => row.id)).toEqual([overdue, closed, lastDay]);
@@ -67,11 +68,11 @@ describe("due follow-ups query (F8)", () => {
   });
 
   it("never returns another user's follow-ups, even when asked with their id", async () => {
-    const { data, error } = await selectDueFollowUps(other, ownerId, LAST_DAY);
+    const { data, error } = await selectDueFollowUps(other, ownerId, UNTIL_DAY);
     expect(error).toBeNull();
     expect(data).toEqual([]);
 
-    const own = await selectDueFollowUps(other, otherId, LAST_DAY);
+    const own = await selectDueFollowUps(other, otherId, UNTIL_DAY);
     expect(own.data?.map((row) => row.company)).toEqual(["Wonka"]);
   });
 

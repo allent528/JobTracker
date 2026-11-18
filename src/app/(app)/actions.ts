@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { type ActionResult, parseOr } from "@/lib/action-result";
 import { getCurrentUser } from "@/lib/auth";
 import { LOGIN_PATH } from "@/lib/auth-routes";
-import { updateOwnApplication, updateOwnTimeZone } from "@/lib/owned-rows";
+import { updateOwnApplication } from "@/lib/owned-rows";
+import { saveTimeZoneIfUnset } from "@/lib/profile-writes";
 import { revalidateAllPages, revalidateApplication } from "@/lib/revalidate";
 import { applicationIdSchema } from "@/lib/schemas/application";
 import { type FollowUpDoneValues, followUpDoneSchema } from "@/lib/schemas/follow-up";
@@ -19,7 +20,6 @@ export async function signOut() {
   redirect(LOGIN_PATH);
 }
 
-/** F8: clears the follow-up, or replaces it with the next one when a date is given. */
 export async function completeFollowUp(id: string, input: FollowUpDoneValues): Promise<ActionResult> {
   const user = await getCurrentUser();
   const parsedId = parseOr(applicationIdSchema, id);
@@ -34,31 +34,14 @@ export async function completeFollowUp(id: string, input: FollowUpDoneValues): P
   return { ok: true, data: undefined };
 }
 
-/**
- * Saves the browser's time zone the first time a signed-in page loads (F8). A zone that's already
- * saved, detected or picked in settings, is never overwritten.
- */
 export async function detectTimeZone(input: TimeZoneFormValues): Promise<ActionResult> {
   const user = await getCurrentUser();
   const parsed = parseOr(timeZoneSchema, input);
   if (!parsed.ok) return parsed;
 
-  const result = await updateOwnTimeZone(user.id, parsed.data.time_zone, { onlyIfUnset: true });
+  const result = await saveTimeZoneIfUnset({ userId: user.id, timeZone: parsed.data.time_zone });
   if (!result.ok) return result;
 
   if (result.data.changed) revalidateAllPages();
-  return { ok: true, data: undefined };
-}
-
-/** The settings page's time zone (F8). */
-export async function updateTimeZone(input: TimeZoneFormValues): Promise<ActionResult> {
-  const user = await getCurrentUser();
-  const parsed = parseOr(timeZoneSchema, input);
-  if (!parsed.ok) return parsed;
-
-  const result = await updateOwnTimeZone(user.id, parsed.data.time_zone);
-  if (!result.ok) return result;
-
-  revalidateAllPages();
   return { ok: true, data: undefined };
 }

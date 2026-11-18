@@ -19,8 +19,6 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL,
-    // The browser's zone is saved to the profile on first sign-in (F8). Specs assume UTC unless they
-    // open a context with their own timezoneId.
     timezoneId: "UTC",
     trace: "on-first-retry",
   },

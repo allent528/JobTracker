@@ -148,8 +148,8 @@
 - **Lesson:** Bound years in any date input that goes through `Date.UTC`.
 
 ## 2026-11-15: A heading plus an inline count span ran together in the accessible name
-- **Mistake:** The e2e looked up the "Today" list by a region name starting with "Today (" and found nothing, though the page showed "Today (2)".
-- **Root cause:** The heading was `Today<span class="ml-2">(2)</span>`; JSX dropped the line break between them. Margin isn't text, so the accessible name was "Today(2)" (screen readers read it that way too).
+- **Mistake:** The e2e looked for a region named "Today (2)" and found none, though the page showed that text.
+- **Root cause:** The heading was `Today` followed by `<span class="ml-2">(2)</span>` on the next line. JSX drops that line break, and margin isn't text, so the accessible name was "Today(2)". Screen readers read it the same way.
 - **Fix:** `{label}{" "}<span>…</span>`.
 - **Lesson:** Visual spacing (margin, gap) doesn't add a space to accessible names; put a real space between text nodes. Recorded in ui.md.
 

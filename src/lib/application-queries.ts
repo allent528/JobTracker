@@ -116,23 +116,21 @@ export async function listInterviews(applicationId: string): Promise<Interview[]
   }));
 }
 
-/** Days `from` (or, without it, any earlier day) up to (not including) `until`, in the owner's time zone. */
-export async function listUpcomingInterviews(range: { from?: DateOnly; until: DateOnly }): Promise<UpcomingInterview[]> {
+/** Pending rounds before the start of `untilDay` in the owner's time zone, with no lower bound. */
+export async function listUpcomingInterviews(untilDay: DateOnly): Promise<UpcomingInterview[]> {
   const [user, timeZone] = await Promise.all([getCurrentUser(), getTimeZone()]);
   const supabase = await createClient();
   const { data, error } = await selectUpcomingInterviews(supabase, user.id, {
-    from: range.from === undefined ? undefined : startOfDayInstant(range.from, timeZone).toISOString(),
-    until: startOfDayInstant(range.until, timeZone).toISOString(),
+    until: startOfDayInstant(untilDay, timeZone).toISOString(),
   });
   if (error) throw new Error("Couldn't load your interviews.");
   return toUpcomingInterviews(data);
 }
 
-/** Follow-ups due on or before `lastDay` (owner-zone date) on unarchived applications. */
-export async function listDueFollowUps(lastDay: DateOnly): Promise<DueFollowUp[]> {
+export async function listDueFollowUps(untilDay: DateOnly): Promise<DueFollowUp[]> {
   const user = await getCurrentUser();
   const supabase = await createClient();
-  const { data, error } = await selectDueFollowUps(supabase, user.id, lastDay);
+  const { data, error } = await selectDueFollowUps(supabase, user.id, untilDay);
   if (error) throw new Error("Couldn't load your follow-ups.");
   return toDueFollowUps(data);
 }

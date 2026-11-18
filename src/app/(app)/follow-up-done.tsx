@@ -19,10 +19,6 @@ import { type FollowUpDoneValues, followUpDoneSchema } from "@/lib/schemas/follo
 
 import { completeFollowUp } from "./actions";
 
-/**
- * F8: marking a follow-up done clears it and offers the next one, prefilled `suggestedNext` days
- * out with the same note. Leaving the date blank just clears it.
- */
 export function FollowUpDoneButton({
   applicationId,
   label,
@@ -44,7 +40,7 @@ export function FollowUpDoneButton({
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Follow-up done</DialogTitle>
+          <DialogTitle>Mark follow-up done</DialogTitle>
           <DialogDescription>
             {label}. Set the next follow-up, or clear the date to stop following up.
           </DialogDescription>
@@ -83,7 +79,7 @@ function FollowUpDoneForm({
           name="next_follow_up_on"
           label="Next follow-up"
           type="date"
-          description="Leave blank for no next follow-up."
+          description="Leave blank to stop following up. The note is cleared too."
         />
         <TextField
           control={form.control}

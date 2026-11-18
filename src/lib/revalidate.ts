@@ -4,19 +4,24 @@ import { revalidatePath } from "next/cache";
 
 import { APPLICATIONS_PATH, applicationPath } from "@/lib/applications";
 import { HOME_PATH } from "@/lib/auth-routes";
+import type { ChildTable } from "@/lib/owned-rows";
 
-/** Every page that lists applications: the pipeline and the home page's reminders (F8). */
-export function revalidatePipeline(): void {
+export function revalidateApplicationLists(): void {
   revalidatePath(APPLICATIONS_PATH);
   revalidatePath(HOME_PATH);
 }
 
 export function revalidateApplication(id: string): void {
-  revalidatePipeline();
+  revalidateApplicationLists();
   revalidatePath(applicationPath(id));
 }
 
-/** A time zone change moves "today" on every signed-in page (D11). */
+/** Notes and contacts show only on the detail page; interviews also show on the home page. */
+export function revalidateApplicationChild(table: ChildTable, applicationId: string): void {
+  revalidatePath(applicationPath(applicationId));
+  if (table === "interviews") revalidatePath(HOME_PATH);
+}
+
 export function revalidateAllPages(): void {
   revalidatePath(HOME_PATH, "layout");
 }

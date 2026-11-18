@@ -6,8 +6,6 @@ export function writeErrorMessage(error: { code?: string } | null | undefined): 
     case "22P02": // invalid_text_representation
     case "22003": // numeric_value_out_of_range
       return "Some values aren't allowed. Check the form and try again.";
-    case "22023": // invalid_parameter_value: only the profiles time zone trigger raises it
-      return "That time zone isn't recognized. Pick another one.";
     case "23503": // foreign_key_violation
     case "42501": // insufficient_privilege / RLS denial
       return "You can't make that change.";

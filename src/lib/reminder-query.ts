@@ -7,15 +7,15 @@ import type { Database } from "@/types/database.types";
 
 // Outside application-queries.ts (server-only) so the local-stack suite can run the real query.
 
-/** Follow-ups dated on or before `lastDay` on unarchived applications, soonest first. */
-export function selectDueFollowUps(supabase: SupabaseClient<Database>, userId: string, lastDay: DateOnly) {
+/** Follow-ups dated before `untilDay` (no lower bound) on unarchived applications, soonest first. */
+export function selectDueFollowUps(supabase: SupabaseClient<Database>, userId: string, untilDay: DateOnly) {
   return supabase
     .from("applications")
     .select("id, company, role_title, status, next_follow_up_on, follow_up_note")
     .eq("user_id", userId)
     .is("archived_at", null)
     .not("next_follow_up_on", "is", null)
-    .lte("next_follow_up_on", lastDay)
+    .lt("next_follow_up_on", untilDay)
     .order("next_follow_up_on");
 }
 

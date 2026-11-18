@@ -16,10 +16,7 @@ export type UpcomingInterview = {
   application: { id: string; company: string; role_title: string; status: Status };
 };
 
-/**
- * Pending rounds in [from, until) (ISO instants) on unarchived applications, soonest first. Without
- * `from`, every earlier pending round is included (F8 shows those as overdue).
- */
+/** Pending rounds in [from, until) (ISO instants; no `from` means no lower bound) on unarchived applications, soonest first. */
 export function selectUpcomingInterviews(
   supabase: SupabaseClient<Database>,
   userId: string,

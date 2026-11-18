@@ -60,6 +60,8 @@ async function UserMenu() {
   );
 }
 
+/** A failed read skips detection here; the page's own reads surface the error in error.tsx. */
 async function DetectTimeZoneIfUnset() {
-  return (await getStoredTimeZone()) === null ? <TimeZoneDetector /> : null;
+  const stored = await getStoredTimeZone().catch(() => undefined);
+  return stored === null ? <TimeZoneDetector /> : null;
 }

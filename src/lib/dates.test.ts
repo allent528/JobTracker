@@ -105,6 +105,11 @@ describe("startOfDayInstant", () => {
     expect(startOfDayInstant("2026-12-01", "Asia/Tokyo").toISOString()).toBe("2026-11-30T15:00:00.000Z");
   });
 
+  it("is the first instant of the day when DST skips midnight", () => {
+    // Chile springs forward at 00:00 on Sep 6, 2026, so that day starts at 01:00 (UTC-3).
+    expect(startOfDayInstant("2026-09-06", "America/Santiago").toISOString()).toBe("2026-09-06T04:00:00.000Z");
+  });
+
   it("round-trips years 1900 to 2999", () => {
     for (const local of ["1900-01-01T00:00", "1969-12-31T23:59", "2999-12-31T23:59"]) {
       expect(instantToLocalDateTime(localDateTimeToInstant(local, "America/New_York"), "America/New_York")).toBe(local);

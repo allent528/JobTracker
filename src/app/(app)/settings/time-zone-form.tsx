@@ -4,14 +4,13 @@ import { FormButtons, SelectField, useSectionForm } from "@/components/section-u
 import { Form } from "@/components/ui/form";
 import { timeZoneSchema } from "@/lib/schemas/settings";
 
-import { updateTimeZone } from "../actions";
+import { updateTimeZone } from "./actions";
 
 export function TimeZoneForm({ current, options }: { current: string; options: string[] }) {
   const { form, pending, onSubmit } = useSectionForm(timeZoneSchema, {
     defaultValues: { time_zone: current },
     action: updateTimeZone,
     success: "Time zone saved.",
-    onDone: () => {},
   });
   return (
     <Form {...form}>

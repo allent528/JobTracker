@@ -3,10 +3,11 @@ import "server-only";
 import { cache } from "react";
 
 import { getCurrentUser } from "@/lib/auth";
-import { type DateOnly, dateInTimeZone, FALLBACK_TIME_ZONE } from "@/lib/dates";
+import { type DateOnly, dateInTimeZone } from "@/lib/dates";
 import { createClient } from "@/lib/supabase/server";
+import { effectiveTimeZone } from "@/lib/time-zones";
 
-/** The saved zone, or null until it's detected from the browser (F8) or picked in settings. */
+/** Null until it's detected from the browser or picked in settings (F8). */
 export const getStoredTimeZone = cache(async (): Promise<string | null> => {
   const user = await getCurrentUser();
   const supabase = await createClient();
@@ -15,7 +16,7 @@ export const getStoredTimeZone = cache(async (): Promise<string | null> => {
   return data?.time_zone ?? null;
 });
 
-export const getTimeZone = cache(async (): Promise<string> => (await getStoredTimeZone()) ?? FALLBACK_TIME_ZONE);
+export const getTimeZone = cache(async (): Promise<string> => effectiveTimeZone(await getStoredTimeZone()));
 
 /** Today in the owner's time zone (D11), once per request so every caller agrees. */
 export const getToday = cache(async (): Promise<DateOnly> => {

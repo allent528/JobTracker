@@ -4,8 +4,6 @@ import { addDays, dateInTimeZone } from "../../src/lib/dates";
 import { expect, test } from "./support/fixtures";
 import { adminClient, findUserByEmail, seedApplications, seedInterviews, TEST_USERS } from "./support/local-env";
 
-// F8: the home page's Overdue / Today / Next 7 days lists, follow-up done, and the owner's time zone.
-
 function collectConsoleErrors(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (message) => {
@@ -85,7 +83,6 @@ test.describe("at phone width", () => {
 
     const week = bucket(page, "Next 7 days");
     await expect(week.getByRole("listitem")).toHaveCount(3);
-    // Closed applications keep their follow-ups (only archived ones are hidden).
     await expect(week.getByRole("listitem").nth(0)).toContainText("Rejected Co");
     await expect(week.getByRole("listitem").nth(1)).toContainText("Room week");
     await expect(week.getByRole("listitem").nth(2)).toContainText("Week Co");
@@ -116,7 +113,7 @@ test.describe("at phone width", () => {
 
     const openDialog = async () => {
       await page.getByRole("button", { name: "Mark follow-up done for Acme Corp, Software Engineer" }).click();
-      return page.getByRole("dialog", { name: "Follow-up done" });
+      return page.getByRole("dialog", { name: "Mark follow-up done" });
     };
 
     let dialog = await openDialog();
@@ -137,9 +134,6 @@ test.describe("at phone width", () => {
     dialog = await openDialog();
     await expect(dialog.getByLabel("Follow-up note")).toHaveValue("Ask about the timeline");
     await dialog.getByLabel("Next follow-up").fill("");
-    await dialog.getByRole("button", { name: "Mark done", exact: true }).click();
-    await expect(dialog.getByText("Pick a date for the next follow-up, or clear the note.")).toBeVisible();
-    await dialog.getByLabel("Follow-up note").fill("");
     await dialog.getByRole("button", { name: "Mark done", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await expect(week.getByText("Nothing in the next 7 days.")).toBeVisible();
@@ -168,7 +162,8 @@ test("the browser's time zone is saved on first sign-in and can be changed in se
   const consoleErrors = collectConsoleErrors(page);
   try {
     await signInAs(email, page);
-    await expect.poll(() => storedTimeZone(email)).toBe(behind);
+    await expect(page.getByText(`in ${behind}.`)).toBeVisible();
+    expect(await storedTimeZone(email)).toBe(behind);
 
     await seedApplications(email, [
       { company: "Ahead Co", role_title: "Engineer", status: "applied", next_follow_up_on: todayIn(ahead) },
@@ -194,7 +189,6 @@ test("the browser's time zone is saved on first sign-in and can be changed in se
     await expect(bucket(page, "Today").getByText("Ahead Co")).toBeVisible();
     await expect(bucket(page, "Overdue").getByText("Behind Co")).toBeVisible();
 
-    // A saved zone is never replaced by detection, even though this browser is still in Pago Pago.
     await page.reload();
     await expect(page.getByText(`in ${ahead}.`)).toBeVisible();
     expect(await storedTimeZone(email)).toBe(ahead);

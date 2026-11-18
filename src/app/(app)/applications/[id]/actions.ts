@@ -1,12 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { type ActionResult, parseOr } from "@/lib/action-result";
-import { applicationPath } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
-import { HOME_PATH } from "@/lib/auth-routes";
 import { writeErrorMessage } from "@/lib/db-errors";
 import { localDateTimeToInstant } from "@/lib/dates";
 import {
@@ -19,6 +16,7 @@ import {
   updateOwnChild,
 } from "@/lib/owned-rows";
 import { getTimeZone } from "@/lib/profile";
+import { revalidateApplicationChild } from "@/lib/revalidate";
 import { type ContactFormValues, contactSchema } from "@/lib/schemas/contact";
 import { type InterviewFormValues, type InterviewInput, interviewSchema } from "@/lib/schemas/interview";
 import { type NoteFormValues, noteSchema } from "@/lib/schemas/note";
@@ -49,20 +47,12 @@ async function parseRequest<S extends z.ZodType>(
   return parsed.ok ? { ok: true, data: { ...parsedId.data, values: parsed.data } } : parsed;
 }
 
-/** Pages that list upcoming interviews. */
-const INTERVIEW_LIST_PATHS: readonly string[] = [HOME_PATH];
-
-function revalidateDetail(table: ChildTable, row: ChildRow): void {
-  revalidatePath(applicationPath(row.application_id));
-  if (table === "interviews") for (const path of INTERVIEW_LIST_PATHS) revalidatePath(path);
-}
-
 async function deleteChild(table: ChildTable, id: string): Promise<ActionResult> {
   const request = await parseId(table, id);
   if (!request.ok) return request;
   const result = await deleteOwnChild({ table, ...request.data });
   if (!result.ok) return result;
-  revalidateDetail(table, result.data);
+  revalidateApplicationChild(table, result.data.application_id);
   return { ok: true, data: undefined };
 }
 
@@ -71,7 +61,7 @@ export async function createNote(applicationId: string, input: NoteFormValues): 
   if (!request.ok) return request;
   const result = await insertChild("notes", { application_id: request.data.id, ...request.data.values });
   if (!result.ok) return result;
-  revalidateDetail("notes", result.data);
+  revalidateApplicationChild("notes", result.data.application_id);
   return { ok: true, data: undefined };
 }
 
@@ -81,7 +71,7 @@ export async function updateNote(id: string, input: NoteFormValues): Promise<Act
   const { userId, values } = request.data;
   const result = await updateOwnChild({ table: "notes", userId, id: request.data.id, patch: values });
   if (!result.ok) return result;
-  revalidateDetail("notes", result.data);
+  revalidateApplicationChild("notes", result.data.application_id);
   return { ok: true, data: undefined };
 }
 
@@ -94,7 +84,7 @@ export async function createContact(applicationId: string, input: ContactFormVal
   if (!request.ok) return request;
   const result = await insertChild("contacts", { application_id: request.data.id, ...request.data.values });
   if (!result.ok) return result;
-  revalidateDetail("contacts", result.data);
+  revalidateApplicationChild("contacts", result.data.application_id);
   return { ok: true, data: undefined };
 }
 
@@ -104,7 +94,7 @@ export async function updateContact(id: string, input: ContactFormValues): Promi
   const { userId, values } = request.data;
   const result = await updateOwnChild({ table: "contacts", userId, id: request.data.id, patch: values });
   if (!result.ok) return result;
-  revalidateDetail("contacts", result.data);
+  revalidateApplicationChild("contacts", result.data.application_id);
   return { ok: true, data: undefined };
 }
 
@@ -182,12 +172,12 @@ export async function createInterview(
       // Don't keep a round without the interviewers the owner picked. If that delete fails too,
       // revalidate so the leftover round shows.
       const removed = await deleteOwnChild({ table: "interviews", userId, id: result.data.id });
-      if (!removed.ok) revalidateDetail("interviews", result.data);
+      if (!removed.ok) revalidateApplicationChild("interviews", result.data.application_id);
       return linkError(error);
     }
   }
 
-  revalidateDetail("interviews", result.data);
+  revalidateApplicationChild("interviews", result.data.application_id);
   return { ok: true, data: { suggestInterviewing: await shouldSuggestInterviewing(userId, request.data.id) } };
 }
 
@@ -206,7 +196,7 @@ export async function updateInterview(id: string, input: InterviewFormValues): P
   if (!result.ok) return result;
 
   const replaced = await replaceInterviewers(userId, result.data, values.contact_ids);
-  revalidateDetail("interviews", result.data);
+  revalidateApplicationChild("interviews", result.data.application_id);
   return replaced;
 }
 

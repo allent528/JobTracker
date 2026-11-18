@@ -54,7 +54,7 @@ export function useSectionForm<V extends FieldValues, T>(
     defaultValues: V;
     action: (values: V) => Promise<ActionResult<T>>;
     success: string;
-    onDone: (data: T) => void;
+    onDone?: (data: T) => void;
   },
 ) {
   const { pending, run } = useSectionAction();

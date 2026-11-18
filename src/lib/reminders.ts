@@ -1,10 +1,9 @@
 import { addDays, type DateOnly, dateInTimeZone, daysBetween } from "@/lib/dates";
+import { type FollowUpState, followUpState } from "@/lib/follow-ups";
 import type { UpcomingInterview } from "@/lib/interview-query";
 import type { Status } from "@/lib/status";
 
-// F8: the home page's Overdue, Today and Next 7 days lists, in the owner's time zone (D11).
-
-/** Days after today that "Next 7 days" covers (tomorrow through today + 7). */
+/** Days after today that the "upcoming" list covers. */
 export const REMINDER_WINDOW_DAYS = 7;
 
 /** Marking a follow-up done suggests the next one this many days from today (F8). */
@@ -23,49 +22,50 @@ export type Reminder =
   | { kind: "follow_up"; key: string; date: DateOnly; followUp: DueFollowUp }
   | { kind: "interview"; key: string; date: DateOnly; interview: UpcomingInterview };
 
-export const REMINDER_BUCKETS = ["overdue", "today", "next7Days"] as const;
-export type ReminderBucket = (typeof REMINDER_BUCKETS)[number];
-export type ReminderBuckets = Record<ReminderBucket, Reminder[]>;
-
-export const REMINDER_BUCKET_LABELS = {
-  overdue: "Overdue",
-  today: "Today",
-  next7Days: "Next 7 days",
-} as const satisfies Record<ReminderBucket, string>;
+export const REMINDER_BUCKETS = ["overdue", "today", "upcoming"] as const satisfies readonly FollowUpState[];
+export type ReminderBuckets = Record<FollowUpState, Reminder[]>;
 
 /**
- * What the home page loads: follow-ups dated up to `lastDay` (no lower bound, so every overdue one
- * shows), and pending interviews before the start of `untilDay` in the owner's zone.
+ * The home page loads days before `untilDay` (exclusive), with no lower bound so every overdue item
+ * shows. Day windows are half-open `[from, until)` DateOnly ranges throughout.
  */
-export function reminderWindow(today: DateOnly): { lastDay: DateOnly; untilDay: DateOnly } {
-  return { lastDay: addDays(today, REMINDER_WINDOW_DAYS), untilDay: addDays(today, REMINDER_WINDOW_DAYS + 1) };
+export function reminderWindow(today: DateOnly): { untilDay: DateOnly } {
+  return { untilDay: addDays(today, REMINDER_WINDOW_DAYS + 1) };
 }
 
-function bucketFor(date: DateOnly, today: DateOnly): ReminderBucket | null {
-  if (date < today) return "overdue";
-  if (date === today) return "today";
-  return date <= reminderWindow(today).lastDay ? "next7Days" : null;
+function bucketFor(date: DateOnly, today: DateOnly, untilDay: DateOnly): FollowUpState | null {
+  return date < untilDay ? followUpState(date, today) : null;
 }
 
-/** Same day: interviews first by time, then follow-ups by company and role. */
+const KIND_RANK = { interview: 0, follow_up: 1 } as const satisfies Record<Reminder["kind"], number>;
+
+function tiebreakKeys(reminder: Reminder): string[] {
+  switch (reminder.kind) {
+    case "interview":
+      return [reminder.interview.scheduled_at];
+    case "follow_up":
+      return [reminder.followUp.company, reminder.followUp.role_title];
+    default: {
+      const unknown: never = reminder;
+      throw new Error(`Unknown reminder: ${JSON.stringify(unknown)}`);
+    }
+  }
+}
+
+/** By day; on the same day, interviews by time before follow-ups by company and role. */
 function compareReminders(a: Reminder, b: Reminder): number {
   if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-  if (a.kind !== b.kind) return a.kind === "interview" ? -1 : 1;
-  if (a.kind === "interview" && b.kind === "interview") {
-    return a.interview.scheduled_at.localeCompare(b.interview.scheduled_at);
-  }
-  if (a.kind === "follow_up" && b.kind === "follow_up") {
-    return (
-      a.followUp.company.localeCompare(b.followUp.company) || a.followUp.role_title.localeCompare(b.followUp.role_title)
-    );
+  const rank = KIND_RANK[a.kind] - KIND_RANK[b.kind];
+  if (rank !== 0) return rank;
+  const [aKeys, bKeys] = [tiebreakKeys(a), tiebreakKeys(b)];
+  for (let i = 0; i < aKeys.length; i++) {
+    const order = aKeys[i].localeCompare(bKeys[i]);
+    if (order !== 0) return order;
   }
   return 0;
 }
 
-/**
- * Interviews fall on their calendar day in `timeZone`. Anything after the window is dropped, so the
- * result doesn't depend on how wide the query was.
- */
+/** Interviews fall on their calendar day in `timeZone`; anything from `untilDay` on is dropped. */
 export function bucketReminders({
   followUps,
   interviews,
@@ -92,9 +92,10 @@ export function bucketReminders({
     })),
   ].sort(compareReminders);
 
-  const buckets: ReminderBuckets = { overdue: [], today: [], next7Days: [] };
+  const { untilDay } = reminderWindow(today);
+  const buckets: ReminderBuckets = { overdue: [], today: [], upcoming: [] };
   for (const reminder of reminders) {
-    const bucket = bucketFor(reminder.date, today);
+    const bucket = bucketFor(reminder.date, today, untilDay);
     if (bucket) buckets[bucket].push(reminder);
   }
   return buckets;

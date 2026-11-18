@@ -22,15 +22,15 @@ function keys(buckets: ReminderBuckets) {
   return {
     overdue: buckets.overdue.map((r) => r.key),
     today: buckets.today.map((r) => r.key),
-    next7Days: buckets.next7Days.map((r) => r.key),
+    upcoming: buckets.upcoming.map((r) => r.key),
   };
 }
 
 describe("reminderWindow", () => {
-  it("covers tomorrow through today + 7, with interviews loaded up to the start of day 8", () => {
-    expect(reminderWindow("2026-11-15")).toEqual({ lastDay: "2026-11-22", untilDay: "2026-11-23" });
-    expect(reminderWindow("2026-12-28")).toEqual({ lastDay: "2027-01-04", untilDay: "2027-01-05" });
-    expect(reminderWindow("2028-02-25")).toEqual({ lastDay: "2028-03-03", untilDay: "2028-03-04" });
+  it("ends before day 8, across month, year and leap-day boundaries", () => {
+    expect(reminderWindow("2026-11-15")).toEqual({ untilDay: "2026-11-23" });
+    expect(reminderWindow("2026-12-28")).toEqual({ untilDay: "2027-01-05" });
+    expect(reminderWindow("2028-02-25")).toEqual({ untilDay: "2028-03-04" });
   });
 });
 
@@ -54,7 +54,7 @@ describe("bucketReminders", () => {
     expect(keys(buckets)).toEqual({
       overdue: ["follow_up:long-ago", "follow_up:yesterday"],
       today: ["follow_up:today"],
-      next7Days: ["follow_up:tomorrow", "follow_up:day7"],
+      upcoming: ["follow_up:tomorrow", "follow_up:day7"],
     });
   });
 
@@ -69,13 +69,13 @@ describe("bucketReminders", () => {
     expect(keys(bucketReminders({ followUps: [], interviews, today, timeZone: "America/New_York" }))).toEqual({
       overdue: ["interview:last-second-yesterday"],
       today: ["interview:midnight", "interview:late-today"],
-      next7Days: ["interview:end-of-day7"],
+      upcoming: ["interview:end-of-day7"],
     });
     // The same instants in UTC fall a day later around midnight.
     expect(keys(bucketReminders({ followUps: [], interviews, today, timeZone: "UTC" }))).toEqual({
       overdue: [],
       today: ["interview:last-second-yesterday", "interview:midnight"],
-      next7Days: ["interview:late-today"], // Nov 23 04:59 UTC is day 8 in UTC
+      upcoming: ["interview:late-today"], // Nov 23 04:59 UTC is day 8 in UTC
     });
   });
 
@@ -92,7 +92,7 @@ describe("bucketReminders", () => {
     ).toEqual({
       overdue: ["interview:before-change"],
       today: ["interview:after-change", "interview:late-nov1"],
-      next7Days: ["interview:nov2"],
+      upcoming: ["interview:nov2"],
     });
   });
 
@@ -114,7 +114,7 @@ describe("bucketReminders", () => {
       today,
       timeZone: "UTC",
     });
-    expect(keys(buckets).next7Days).toEqual([
+    expect(keys(buckets).upcoming).toEqual([
       "follow_up:early",
       "interview:morning",
       "interview:late",

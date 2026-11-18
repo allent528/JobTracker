@@ -1,6 +1,5 @@
 // Server code formats in the owner's `profiles.time_zone` (D11), never the server's.
 
-/** Used while `profiles.time_zone` is unset (before the browser zone is detected or one is picked). */
 export const FALLBACK_TIME_ZONE = "UTC";
 
 /** `YYYY-MM-DD` as "Nov 14, 2026". Date-only, so no time zone shift applies. */
@@ -63,7 +62,6 @@ export function daysBetween(from: DateOnly, to: DateOnly): number {
   return Math.round((utc(to) - utc(from)) / 86_400_000);
 }
 
-/** Calendar arithmetic on a date-only value; no time zone (and so no DST) is involved. */
 export function addDays(date: DateOnly, days: number): DateOnly {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);

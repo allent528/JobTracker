@@ -72,7 +72,6 @@ export async function seedApplications(
   return data;
 }
 
-/** Interviews on applications from `seedApplications` (same user). */
 export async function seedInterviews(
   email: string,
   rows: Omit<TablesInsert<"interviews">, "user_id">[],
