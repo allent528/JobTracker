@@ -151,7 +151,26 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            [_ in never]: never
+            "stats_applied_per_day":
+{ Args: { "from_day": string,"include_archived": boolean,"until_day": string }; Returns: {
+              "applications": number,"day": string
+            }[]
+                           },
+"stats_response_counts":
+{ Args: { "include_archived": boolean,"reached_statuses": (string)[],"responded_statuses": (string)[] }; Returns: {
+              "reached": number,"responded": number
+            }[]
+                           },
+"stats_stage_durations":
+{ Args: { "include_archived": boolean }; Returns: {
+              "average_days": number,"status": string,"stays": number
+            }[]
+                           },
+"stats_status_counts":
+{ Args: { "include_archived": boolean }; Returns: {
+              "applications": number,"status": string
+            }[]
+                           }
           }
           Enums: {
             [_ in never]: never

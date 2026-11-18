@@ -5,10 +5,12 @@ import { revalidatePath } from "next/cache";
 import { APPLICATIONS_PATH, applicationPath } from "@/lib/applications";
 import { HOME_PATH } from "@/lib/auth-routes";
 import type { ChildTable } from "@/lib/owned-rows";
+import { STATS_PATH } from "@/lib/stats";
 
 export function revalidateApplicationLists(): void {
   revalidatePath(APPLICATIONS_PATH);
   revalidatePath(HOME_PATH);
+  revalidatePath(STATS_PATH);
 }
 
 export function revalidateApplication(id: string): void {

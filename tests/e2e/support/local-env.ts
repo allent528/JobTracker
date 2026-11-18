@@ -24,6 +24,9 @@ export const TEST_USERS = {
   homeTimeZone: "e2e-home-time-zone@example.com",
   homeIsolationOwner: "e2e-home-isolation-owner@example.com",
   homeIsolationOther: "e2e-home-isolation-other@example.com",
+  stats: "e2e-stats@example.com",
+  statsIsolationOwner: "e2e-stats-isolation-owner@example.com",
+  statsIsolationOther: "e2e-stats-isolation-other@example.com",
 } as const;
 
 /** Must never have an account; global setup deletes it if a past run left one. */

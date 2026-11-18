@@ -34,7 +34,8 @@ paths:
 - Give each spec its own test user/inbox: tests run in parallel and Mailpit searches by recipient.
 - `getByRole("alert")` also matches Next's empty `#__next-route-announcer__`; filter by text (`.filter({ hasText })`).
 - Signed-in specs use the `signInAs(email, page?)` fixture from `tests/e2e/support/fixtures.ts` (import `test`/`expect` from there): it deletes the user's applications, makes a magic-link token hash with the admin API and opens `/auth/confirm` with it. No email involved. Pass a page from `browser.newContext()` to sign in a second user. Add a user per test to `TEST_USERS`.
-- Hidden, still-mounted routes (docs/learnings.md) mean `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`.
+- Hidden, still-mounted routes (docs/learnings.md) mean `getByLabel` and CSS locators can match a field twice. Use role locators (they skip hidden elements) or `.filter({ visible: true })`. Streaming can also briefly leave a hidden copy after a plain `page.goto`, so `getByText` on page content gets `.filter({ visible: true })` too.
+- Backdate `status_events` in e2e with `localSuperuserQuery` from `tests/rls/support.ts` (see `tests/e2e/stats.spec.ts`).
 - `signInAs` clears the user's applications and `profiles.time_zone`, then ends on `/` (the reminders home page). The browser's zone is saved on that first load, so `playwright.config.ts` sets `timezoneId: "UTC"`; a spec that needs another zone opens `browser.newContext({ timezoneId })`.
 - For time-zone e2e that must not depend on the time of day, compare Pacific/Kiritimati (UTC+14) with Pacific/Pago_Pago (UTC-11): their dates always differ.
 - Seed fake rows with `seedApplications(email, rows)` from `local-env.ts` after signing in, since sign-in clears the user's applications. It inserts with `defaultToNull: false`, so rows can leave columns out.

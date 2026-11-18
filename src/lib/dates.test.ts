@@ -10,6 +10,8 @@ import {
   instantToLocalDateTime,
   localDateTimeToInstant,
   startOfDayInstant,
+  startOfWeek,
+  formatMonthDay,
 } from "./dates";
 
 describe("formatDate", () => {
@@ -130,5 +132,24 @@ describe("addDays", () => {
   it("is unaffected by DST changes (date-only arithmetic)", () => {
     expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
     expect(addDays("2026-03-07", 2)).toBe("2026-03-09");
+  });
+});
+
+describe("startOfWeek", () => {
+  it.each([
+    ["2026-11-16", "2026-11-16"], // Monday
+    ["2026-11-17", "2026-11-16"], // Tuesday
+    ["2026-11-22", "2026-11-16"], // Sunday
+    ["2027-01-01", "2026-12-28"], // across a year
+    ["2028-03-01", "2028-02-28"], // Wednesday after a leap day
+  ])("%s → %s", (date, monday) => {
+    expect(startOfWeek(date)).toBe(monday);
+  });
+});
+
+describe("formatMonthDay", () => {
+  it("formats without a year or zone shift", () => {
+    expect(formatMonthDay("2026-11-16")).toBe("Nov 16");
+    expect(formatMonthDay("2027-01-01")).toBe("Jan 1");
   });
 });

@@ -158,3 +158,9 @@
 - **Root cause:** Node's list has no `UTC` (our fallback) and returns `Asia/Calcutta`, not `Asia/Kolkata`, while browsers may report either. Newer Intl versions also accept offset zones like `+05:00`, which Postgres's `pg_timezone_names` doesn't list.
 - **Fix:** `isSupportedTimeZone` checks an IANA-shaped name and that `Intl.DateTimeFormat` accepts it; the settings list adds UTC and the saved zone to Intl's list. The DB trigger stays the final check.
 - **Lesson:** Validate zones by "Intl can format in it" plus a name shape, not by membership in `supportedValuesOf`.
+
+## 2026-11-17: A full page load can show a hidden duplicate of streamed content
+- **Mistake:** The stats isolation e2e failed about one run in six with a strict-mode violation: `getByText("No applications to count yet.")` matched two paragraphs, one hidden, right after `page.goto`.
+- **Root cause:** Not only the Activity-kept routes (2026-11-14 entry): while a Suspense boundary streams in, the DOM can briefly hold a hidden copy of the content. `getByText` doesn't skip hidden elements.
+- **Fix:** `getByText(message, { exact: true }).filter({ visible: true })`. Found with `--repeat-each=6 --workers=1`.
+- **Lesson:** In e2e, every text or label locator for streamed content gets `.filter({ visible: true })` (role locators already skip hidden elements). Repeat a new spec serially before calling it stable.

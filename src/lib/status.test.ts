@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIVE_STATUSES,
   CLOSED_STATUSES,
+  forwardPathFrom,
   isStatus,
   nextSuggestedStatus,
+  RESPONSE_RATE_STATUSES,
   STATUS_META,
   STATUSES,
 } from "./status";
@@ -48,5 +50,21 @@ describe("isStatus", () => {
   it("recognizes statuses", () => {
     expect(isStatus("applied")).toBe(true);
     expect(isStatus("hired")).toBe(false);
+  });
+});
+
+describe("forwardPathFrom", () => {
+  it("returns the status and everything after it on the forward path", () => {
+    expect(forwardPathFrom("applied")).toEqual(["applied", "screening", "interviewing", "offer", "accepted"]);
+    expect(forwardPathFrom("accepted")).toEqual(["accepted"]);
+  });
+
+  it("is empty for a status off the forward path", () => {
+    expect(forwardPathFrom("rejected")).toEqual([]);
+  });
+
+  it("gives the response rate sets: screening or later, out of applied or later", () => {
+    expect(RESPONSE_RATE_STATUSES.reached).toEqual(["applied", "screening", "interviewing", "offer", "accepted"]);
+    expect(RESPONSE_RATE_STATUSES.responded).toEqual(["screening", "interviewing", "offer", "accepted"]);
   });
 });

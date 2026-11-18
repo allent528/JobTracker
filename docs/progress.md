@@ -353,3 +353,32 @@
 **Follow-ups**
 - A page left open past midnight keeps the server's "today" until the next refresh (same as the board, D11).
 - Deferred from review: rebuild the application form on the shared form pieces and split `section-ui.tsx` into form fields and the editable row; optionally rename `reminder-query.ts` to `follow-up-query.ts`; reject Intl-unsupported zone names in the database (next migration); no rate limit on settings writes.
+
+## 2026-11-17: Launch step 8 (Stats dashboard, F9)
+**Status:** Done, pending owner review (branch `feat/stats`). One new migration, applied to the local stack only; nothing touched prod.
+**What was done**
+- Migration `20261118025658_create_stats_functions` (D13): four `language sql stable security invoker` functions with `set search_path = ''`, each filtering `user_id = (select auth.uid())` on top of RLS. Execute is revoked from public, anon and service_role and granted to authenticated only. No status value appears in the SQL, and nothing reads `now()` or `current_date`.
+  - `stats_status_counts(include_archived)`: applications per current status.
+  - `stats_applied_per_day(from_day, until_day, include_archived)`: applications per `date_applied` in the half-open `[from_day, until_day)` window.
+  - `stats_response_counts(reached_statuses, responded_statuses, include_archived)`: applications whose history ever reached one of the first list, and how many of those ever reached one of the second. The lists come from `RESPONSE_RATE_STATUSES` in `status.ts`.
+  - `stats_stage_durations(include_archived)`: completed stays per status, using `lead(changed_at)` over each application's events ordered by `changed_at` (id breaks ties). Returns the stay count and average elapsed days.
+- `/stats` page with the nav link "Stats": an "Include archived applications" checkbox (`?archived=1`), Applications by status (a table of Active and Closed groups with counts, bars and a total), Response rate (percent plus "x of y"), Applications per week (a shadcn/Recharts bar chart in `--chart-2` with a text total, an `aria-label` and a "Show as table" table), and Average days in each stage (a table). The empty state replaces the sections when nothing is counted.
+- `src/lib/stats.ts` (pure): `statsWindow(today)`, `toStatusCounts`, `toWeekCounts`, `toResponseRate`, `toStageDurations`, `formatDays`, the `?archived` param helpers and `STATS_PATH`. `src/lib/stats-query.ts` (outside server-only) runs the four RPCs; `getStats(includeArchived)` in application-queries.ts passes `getToday()`.
+- `dates.ts`: `startOfWeek` (Monday) and `formatMonthDay`. `status.ts`: `forwardPathFrom` and `RESPONSE_RATE_STATUSES`.
+- `revalidateApplicationLists()` now also revalidates `/stats`.
+- shadcn `chart` added (adds `recharts` 3.8; repo recharts/recharts, maintainers checked).
+**Files:** `supabase/migrations/20261118025658_create_stats_functions.sql`, `src/types/database.types.ts`, `src/app/(app)/stats/{page.tsx,weekly-chart.tsx,include-archived-toggle.tsx}`, `src/app/(app)/layout.tsx`, `src/components/ui/chart.tsx`, `src/lib/{stats,stats-query,dates,status,revalidate,application-queries}.ts`, unit tests beside them, `tests/rls/stats-query.test.ts`, `tests/e2e/stats.spec.ts`, `tests/e2e/support/local-env.ts`, `package.json`, `package-lock.json`, `.claude/rules/{database,server-actions,ui,testing}.md`, `docs/learnings.md`
+**Tests**
+- Unit: `startOfWeek` (Sunday, Monday, year and leap boundaries), `formatMonthDay`, `statsWindow` (12 weeks, half-open, Sunday/Monday edges, a year boundary, and the same instant falling in different weeks in Pago Pago and Kiritimati), week binning (edges in, outside days ignored), status counts, response rate rounding and the no-data case, stage durations, `formatDays`, `forwardPathFrom`, the response-rate sets.
+- Local stack (`tests/rls/stats-query.test.ts`, runs the real `selectStats`): backdated status events give exact stage averages; archived excluded and included; window edges; another user sees all zeros and their own rows never reach the owner's stats; anon gets 42501 from all four functions.
+- E2E `tests/e2e/stats.spec.ts`: at 375px with seeded fake data and backdated events, the counts, 50% response rate, weekly totals and table, and "Applied 4 days 2" show. The archived toggle changes the numbers, survives a reload and turns off. No horizontal scroll, no console errors or warnings. A second user sees the empty state on both toggle settings. 6 repeats serially, no flakes after the fix in learnings.
+**Checks:** `npx supabase db reset` clean; typecheck, lint, `npm test` (190), build with the CI placeholder env, `npm run test:e2e` (20/20), `npm run test:rls` (40/40, on its own). Local advisors: only the expected `unused_index` INFO; `db lint --schema public,private`: no errors. Screenshots checked at 375px and 1280px, light and with `.dark` on `<html>`.
+**Decisions / defaults** (PRD silent)
+- Weeks start on Monday (ISO). "Last 12 weeks" is the current week plus the 11 before it, by `date_applied` in any status; a future `date_applied` in the current week counts.
+- Response rate goes by status history along the forward path: "reached Applied" means the application ever had Applied or a later forward stage (Screening, Interviewing, Offer, Accepted); "responded" means Screening or later. Rejected, Withdrawn and Ghosted aren't on the path, so an Applied → Rejected application counts as reached but not responded. Shown as a whole percent.
+- Average days per stage counts completed stays only (entering a status until the next change), as elapsed time (seconds / 86400), rounded to 0.1 day. A stage re-entered counts as another stay. The current stage isn't included; the page says so.
+- Status counts use each application's current status. All stats exclude archived applications unless the toggle is on (F9).
+- One query per stat, all from SQL functions (no views): each needs parameters (the window, the toggle, the status lists).
+**Follow-ups**
+- Step 9: push this migration to prod with the other eight (owner approval; security review of the SQL first).
+- The design pass after this step can restyle the page; the response-rate tile leaves empty space at desktop width.

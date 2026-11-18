@@ -37,6 +37,22 @@ export function nextSuggestedStatus(status: Status): Status | null {
   return i === -1 || i === FORWARD_PATH.length - 1 ? null : FORWARD_PATH[i + 1];
 }
 
+/** `status` and every status after it on the suggested forward path. */
+export function forwardPathFrom(status: Status): readonly Status[] {
+  const i = FORWARD_PATH.indexOf(status);
+  return i === -1 ? [] : FORWARD_PATH.slice(i);
+}
+
+/**
+ * F9 response rate: applications that ever reached `responded` out of those that ever reached
+ * `reached`. A closed status (rejected, withdrawn, ghosted) isn't on the forward path, so it counts
+ * only through the stages reached before it.
+ */
+export const RESPONSE_RATE_STATUSES = {
+  reached: forwardPathFrom("applied"),
+  responded: forwardPathFrom("screening"),
+} as const;
+
 export function isStatus(value: string): value is Status {
   return (STATUSES as readonly string[]).includes(value);
 }

@@ -67,6 +67,21 @@ export function addDays(date: DateOnly, days: number): DateOnly {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
+/** The Monday on or before `date` (ISO weeks start on Monday). */
+export function startOfWeek(date: DateOnly): DateOnly {
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay(); // 0 = Sunday
+  return addDays(date, -((weekday + 6) % 7));
+}
+
+/** `YYYY-MM-DD` as "Nov 16". */
+export function formatMonthDay(date: DateOnly): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(
+    new Date(Date.UTC(year, month - 1, day)),
+  );
+}
+
 /** How far `timeZone`'s wall clock is ahead of UTC at `instant`, in milliseconds. */
 function zoneOffsetMs(instant: Date, timeZone: string): number {
   const p = zonedParts(instant, timeZone);

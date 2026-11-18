@@ -14,6 +14,8 @@ import type { DueFollowUp } from "@/lib/reminders";
 import { getTimeZone, getToday } from "@/lib/profile";
 import { applicationIdSchema } from "@/lib/schemas/application";
 import type { Status } from "@/lib/status";
+import type { Stats } from "@/lib/stats";
+import { selectStats } from "@/lib/stats-query";
 import { storedInterviewKind, storedInterviewOutcome, storedStatus, storedWorkMode } from "@/lib/stored";
 import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/types/database.types";
@@ -133,4 +135,10 @@ export async function listDueFollowUps(untilDay: DateOnly): Promise<DueFollowUp[
   const { data, error } = await selectDueFollowUps(supabase, user.id, untilDay);
   if (error) throw new Error("Couldn't load your follow-ups.");
   return toDueFollowUps(data);
+}
+
+export async function getStats(includeArchived: boolean): Promise<Stats> {
+  const today = await getToday();
+  const supabase = await createClient();
+  return selectStats(supabase, { today, includeArchived });
 }
