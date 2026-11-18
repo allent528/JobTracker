@@ -106,7 +106,7 @@ export function PipelineTable({ items, timeZone }: { items: PipelineItem[]; time
         {rows.length === 1 ? "1 application" : `${rows.length} applications`}
       </p>
 
-      <div className="rounded-lg border bg-card [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
+      <div className="table-panel rounded-lg border bg-card">
         <Table aria-label="Applications">
           <TableHeader>
             <TableRow>
@@ -128,7 +128,7 @@ export function PipelineTable({ items, timeZone }: { items: PipelineItem[]; time
                   <TableCell className="font-medium">
                     <Link
                       href={applicationPath(item.id)}
-                      className="underline-offset-4 hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                      className="underline-offset-4 hover:underline"
                     >
                       {item.company}
                     </Link>
@@ -178,7 +178,7 @@ function SortableHead({ column, label, sort, onSort }: SortableHeadProps) {
       <button
         type="button"
         onClick={() => onSort(nextSort(sort, column))}
-        className="-mx-1 inline-flex items-center gap-1 rounded-sm px-1 font-medium hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="-mx-1 inline-flex items-center gap-1 rounded-sm px-1 font-medium hover:text-foreground"
       >
         {label}
         <Icon aria-hidden="true" className={active ? "size-3.5" : "size-3.5 text-muted-foreground"} />

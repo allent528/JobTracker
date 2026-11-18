@@ -1,3 +1,4 @@
+import { Empty } from "@/components/section-ui";
 import { Badge } from "@/components/ui/badge";
 import type { StatusEvent } from "@/lib/application-queries";
 import { INTERVIEW_KIND_LABELS, INTERVIEW_OUTCOME_LABELS, PENDING_OUTCOME } from "@/lib/closed-sets";
@@ -19,10 +20,6 @@ function Section({ id, title, children }: { id: string; title: string; children:
       {children}
     </section>
   );
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">{children}</p>;
 }
 
 function Fields({ items }: { items: [label: string, value: React.ReactNode][] }) {

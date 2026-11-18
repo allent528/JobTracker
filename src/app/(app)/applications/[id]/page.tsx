@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { PanelSection } from "@/components/section-ui";
 import { StageRule } from "@/components/stage-rule";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -90,12 +91,9 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
         </div>
       </header>
 
-      <section aria-labelledby="status-heading" className="grid gap-3 rounded-lg border bg-card p-4 sm:p-5">
-        <h2 id="status-heading" className="text-heading">
-          Status
-        </h2>
+      <PanelSection id="status" title="Status">
         <StatusControl id={app.id} status={app.status} />
-      </section>
+      </PanelSection>
 
       <section aria-labelledby="details-heading" className="grid gap-3">
         <h2 id="details-heading" className="text-heading">

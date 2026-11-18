@@ -24,16 +24,12 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
     <>
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 px-4 sm:flex-nowrap">
-          <Link
-            href={HOME_PATH}
-            className="flex h-12 items-center text-[0.9375rem] font-semibold tracking-[-0.01em] sm:h-14"
-          >
+          <Link href={HOME_PATH} className="flex h-12 items-center font-semibold tracking-tight sm:h-14">
             JobTracker
           </Link>
-          {/* Below sm the nav takes its own row under the brand and the sign-out button. */}
           <nav
             aria-label="Main"
-            className="order-last -mx-4 flex w-[calc(100%+2rem)] border-t px-2 sm:order-none sm:mx-0 sm:w-auto sm:px-0 sm:flex-1 sm:self-stretch sm:border-t-0 sm:[&>a]:h-14"
+            className="order-last flex basis-full gap-5 border-t sm:order-none sm:flex-1 sm:basis-auto sm:border-t-0"
           >
             <Suspense fallback={<MainNavLinks links={NAV_LINKS} />}>
               <MainNavActive links={NAV_LINKS} />

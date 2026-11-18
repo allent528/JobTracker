@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 
-import { EditableRow, FormButtons, TextAreaField, TextField, useSectionForm } from "@/components/section-ui";
+import {
+  ADD_FORM_PANEL,
+  EditableRow,
+  FormButtons,
+  TextAreaField,
+  TextField,
+  useSectionForm,
+} from "@/components/section-ui";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action-result";
@@ -34,7 +41,7 @@ function ContactForm({
 
   return (
     <Form {...form}>
-      <form noValidate className="grid gap-4 rounded-lg border bg-card p-4 [li_&]:border-0 [li_&]:p-0" onSubmit={onSubmit}>
+      <form noValidate className="grid gap-4" onSubmit={onSubmit}>
         <fieldset className="grid items-start gap-4 sm:grid-cols-2">
           <legend className="mb-3 font-semibold">{legend}</legend>
           <TextField control={control} name="name" label="Name" maxLength={LIMITS.name} required />
@@ -75,14 +82,16 @@ export function AddContact({ applicationId }: { applicationId: string }) {
     );
   }
   return (
-    <ContactForm
-      legend="New contact"
-      submitLabel="Add contact"
-      defaultValues={EMPTY_CONTACT_FORM}
-      action={(values) => createContact(applicationId, values)}
-      success="Contact added."
-      onDone={() => setOpen(false)}
-    />
+    <div className={ADD_FORM_PANEL}>
+      <ContactForm
+        legend="New contact"
+        submitLabel="Add contact"
+        defaultValues={EMPTY_CONTACT_FORM}
+        action={(values) => createContact(applicationId, values)}
+        success="Contact added."
+        onDone={() => setOpen(false)}
+      />
+    </div>
   );
 }
 

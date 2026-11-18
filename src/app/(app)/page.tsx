@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { Empty } from "@/components/section-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { listDueFollowUps, listUpcomingInterviews } from "@/lib/application-queries";
@@ -78,9 +79,7 @@ async function Reminders() {
               </span>
             </h2>
             {buckets[bucket].length === 0 ? (
-              <p className="rounded-lg border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                {BUCKET_COPY[bucket].empty}
-              </p>
+              <Empty>{BUCKET_COPY[bucket].empty}</Empty>
             ) : (
               <ul className="divide-y rounded-lg border bg-card text-card-foreground">
                 {buckets[bucket].map((reminder) => (

@@ -3,7 +3,15 @@
 import { useState } from "react";
 import type { Control } from "react-hook-form";
 
-import { EditableRow, FormButtons, SelectField, TextAreaField, TextField, useSectionForm } from "@/components/section-ui";
+import {
+  ADD_FORM_PANEL,
+  EditableRow,
+  FormButtons,
+  SelectField,
+  TextAreaField,
+  TextField,
+  useSectionForm,
+} from "@/components/section-ui";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormDescription, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -64,7 +72,7 @@ function InterviewForm<T>({
 
   return (
     <Form {...form}>
-      <form noValidate className="grid gap-4 rounded-lg border bg-card p-4 [li_&]:border-0 [li_&]:p-0" onSubmit={onSubmit}>
+      <form noValidate className="grid gap-4" onSubmit={onSubmit}>
         <fieldset className="grid items-start gap-4 sm:grid-cols-2">
           <legend className="mb-3 font-semibold">{legend}</legend>
           <SelectField control={control} name="kind" label="Type" options={INTERVIEW_KINDS} labels={INTERVIEW_KIND_LABELS} />
@@ -203,20 +211,22 @@ export function AddInterview({
         </div>
       )}
       {open ? (
-        <InterviewForm
-          legend="New interview"
-          submitLabel="Add interview"
-          defaultValues={EMPTY_INTERVIEW_FORM}
-          contacts={contacts}
-          timeZone={timeZone}
-          action={(values) => createInterview(applicationId, values)}
-          success="Interview added."
-          onDone={({ suggestInterviewing }) => {
-            setOpen(false);
-            setSuggest(suggestInterviewing);
-          }}
-          onCancel={() => setOpen(false)}
-        />
+        <div className={ADD_FORM_PANEL}>
+          <InterviewForm
+            legend="New interview"
+            submitLabel="Add interview"
+            defaultValues={EMPTY_INTERVIEW_FORM}
+            contacts={contacts}
+            timeZone={timeZone}
+            action={(values) => createInterview(applicationId, values)}
+            success="Interview added."
+            onDone={({ suggestInterviewing }) => {
+              setOpen(false);
+              setSuggest(suggestInterviewing);
+            }}
+            onCancel={() => setOpen(false)}
+          />
+        </div>
       ) : (
         <Button type="button" variant="outline" className="justify-self-start" onClick={() => setOpen(true)}>
           Add interview

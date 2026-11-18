@@ -5,8 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import "./globals.css";
 
-// Archivo (SIL OFL 1.1, see fonts/Archivo-OFL.txt), Latin subset, variable weight. Self-hosted,
-// so nothing loads from a third party; other scripts fall back to the system sans per glyph.
+// Archivo, SIL OFL 1.1: see fonts/Archivo-OFL.txt
 const archivo = localFont({
   src: "./fonts/archivo-latin-wght-normal.woff2",
   weight: "100 900",

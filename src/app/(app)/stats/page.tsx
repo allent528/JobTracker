@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
+import { Empty, PanelSection } from "@/components/section-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getStats } from "@/lib/application-queries";
@@ -16,7 +17,6 @@ import {
   type StatusCount,
   type StatusCounts,
 } from "@/lib/stats";
-import { cn } from "@/lib/utils";
 
 import { STATS_MARK_COLOR } from "./chart-color";
 import { IncludeArchivedToggle } from "./include-archived-toggle";
@@ -43,53 +43,27 @@ async function StatsContent({ searchParams }: Pick<PageProps<"/stats">, "searchP
     <>
       <IncludeArchivedToggle checked={includeArchived} />
       {stats.statusCounts.total === 0 ? (
-        <p className="rounded-lg border border-dashed bg-card p-8 text-center text-muted-foreground">
-          No applications to count yet.
-        </p>
+        <Empty size="page">No applications to count yet.</Empty>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2 lg:gap-6">
-          <StatSection id="response-rate" title="Response rate" className="lg:col-span-2">
+          <PanelSection id="response-rate" title="Response rate" className="lg:col-span-2">
             <ResponseRateTile rate={stats.responseRate} />
-          </StatSection>
-          <StatSection id="status-counts" title="Applications by status">
+          </PanelSection>
+          <PanelSection id="status-counts" title="Applications by status">
             <StatusCountsTable counts={stats.statusCounts} />
-          </StatSection>
-          <StatSection id="stage-durations" title="Average days in each stage">
+          </PanelSection>
+          <PanelSection id="stage-durations" title="Average days in each stage">
             <StageDurationsTable durations={stats.stageDurations} />
-          </StatSection>
-          <StatSection id="weekly" title={`Applications per week (last ${STATS_WEEKS} weeks)`} className="lg:col-span-2">
+          </PanelSection>
+          <PanelSection id="weekly" title={`Applications per week (last ${STATS_WEEKS} weeks)`} className="lg:col-span-2">
             <p className="text-sm text-muted-foreground">
               By date applied, weeks starting Monday, from {formatDate(stats.fromDay)}.
             </p>
             <WeeklyChart weeks={stats.weeks} />
-          </StatSection>
+          </PanelSection>
         </div>
       )}
     </>
-  );
-}
-
-function StatSection({
-  id,
-  title,
-  className,
-  children,
-}: {
-  id: string;
-  title: string;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      aria-labelledby={`${id}-heading`}
-      className={cn("grid min-w-0 content-start gap-3 rounded-lg border bg-card p-4 text-card-foreground sm:p-5", className)}
-    >
-      <h2 id={`${id}-heading`} className="text-heading">
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }
 
@@ -112,7 +86,7 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
               <span className="w-8 text-right tabular-nums">{applications}</span>
               <span aria-hidden className="flex-1">
                 <span
-                  className="block h-2 rounded-[1px]"
+                  className="block h-2 rounded-sm"
                   style={{ width: `${(applications / max) * 100}%`, backgroundColor: STATS_MARK_COLOR }}
                 />
               </span>

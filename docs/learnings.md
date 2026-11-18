@@ -197,6 +197,6 @@
 
 ## 2026-11-18: A long heredoc failed to parse in the Bash tool
 - **Mistake:** Appending two doc entries with `cat >> file <<'EOF'` failed with "unexpected EOF while looking for matching `''", and nothing was written.
-- **Root cause:** Not pinned down; likely the same tool-layer rewriting as the 2026-11-14 heredoc entries, here on text with apostrophes and backticks.
+- **Root cause:** Unknown. It may be the same tool-layer rewriting as the 2026-11-14 heredoc entries.
 - **Fix:** Appended with the Edit tool.
 - **Lesson:** Write prose with Write or Edit, not heredocs.

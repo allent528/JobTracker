@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useId, useOptimistic, useState, useSyncExternalStore } from "react";
 
 import { FollowUpBadge } from "@/components/follow-up-badge";
+import { Empty } from "@/components/section-ui";
 import { StageRule } from "@/components/stage-rule";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,8 +42,10 @@ import { type StatusMove, useChangeStatus } from "./use-change-status";
 
 type BoardProps = { items: PipelineItem[]; today: DateOnly };
 
-// The card settling back on drop: --duration-fast on --ease-smooth-out (globals.css), none with reduced motion.
-const DROP_ANIMATION = { duration: 250, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
+// dnd-kit animates in JS, so it takes the globals.css token values directly.
+const DURATION_FAST_MS = 250;
+const EASE_SMOOTH_OUT = "cubic-bezier(0.22, 1, 0.36, 1)";
+const DROP_ANIMATION = { duration: DURATION_FAST_MS, easing: EASE_SMOOTH_OUT };
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 
 function usePrefersReducedMotion() {
@@ -171,7 +174,7 @@ function BoardColumn({ status, cards, today, onMove }: ColumnProps) {
         <StageRule status={status} />
       </div>
       {cards.length === 0 ? (
-        <p className="rounded-md border border-dashed px-1 py-6 text-center text-sm text-muted-foreground">No applications</p>
+        <Empty>No applications</Empty>
       ) : (
         <ul className="grid gap-2">
           {cards.map((item) => (
@@ -200,7 +203,7 @@ function BoardCard({ item, today, onMove }: { item: PipelineItem } & Omit<Column
         href={applicationPath(item.id)}
         // A native link drag would take over from the board drag.
         draggable={false}
-        className="rounded-sm hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="rounded-sm hover:underline"
       >
         <CardSummary item={item} today={today} />
       </Link>

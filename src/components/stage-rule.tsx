@@ -1,12 +1,15 @@
-import { ACTIVE_STATUSES, type Status } from "@/lib/status";
+import { ACTIVE_STATUSES, forwardPathFrom, type Status } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
-/**
- * A segmented rule along the active stages, filled up to `status`. Decorative: the status is
- * always stated in text beside it. A closed status leaves every segment empty.
- */
+/** Active stages reached: all of them at the end of the forward path, none for other closed statuses. */
+function stagesReached(status: Status): number {
+  const active = ACTIVE_STATUSES.indexOf(status);
+  if (active !== -1) return active + 1;
+  return forwardPathFrom(status).length === 1 ? ACTIVE_STATUSES.length : 0;
+}
+
 export function StageRule({ status, className }: { status: Status; className?: string }) {
-  const reached = ACTIVE_STATUSES.indexOf(status);
+  const reached = stagesReached(status);
   return (
     <span aria-hidden="true" className={cn("grid grid-flow-col gap-0.5", className)}>
       {ACTIVE_STATUSES.map((stage, i) => (
@@ -15,7 +18,7 @@ export function StageRule({ status, className }: { status: Status; className?: s
           style={{ transitionDelay: `calc(var(--duration-stagger) * ${i})` }}
           className={cn(
             "h-[3px] transition-colors duration-(--duration-fast)",
-            i <= reached ? "bg-stage-on" : "bg-stage-off",
+            i < reached ? "bg-stage-on" : "bg-stage-off",
           )}
         />
       ))}

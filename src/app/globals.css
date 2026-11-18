@@ -2,47 +2,40 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Dark follows the OS setting; there is no theme toggle. DESIGN.md documents every token below. */
+/* DESIGN.md documents the tokens the app uses. Dark follows the OS; there is no toggle. */
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
+
+  /* shadcn colour roles */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-2: var(--chart-2);
+
+  /* JobTracker colour roles */
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-stage-on: var(--stage-on);
   --color-stage-off: var(--stage-off);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
+
   --radius-sm: calc(var(--radius) * 0.5);
   --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
@@ -53,7 +46,6 @@
 }
 
 @theme {
-  /* Type roles (fixed rem, product UI). Body is Tailwind's text-base / text-sm / text-xs. */
   --text-title: 1.75rem;
   --text-title--line-height: 2.125rem;
   --text-title--letter-spacing: -0.022em;
@@ -67,22 +59,19 @@
   --text-figure--letter-spacing: -0.03em;
   --text-figure--font-weight: 500;
 
-  /* Elevation: flat controls, one soft shadow for things that float (menus, dialogs, a dragged card). */
   --shadow-xs: 0 0 #0000;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --shadow-sm: 0 0 #0000;
   --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.22), 0 2px 6px -2px rgb(0 0 0 / 0.1);
 
-  /* Motion: transitions-dev scale. `ease-smooth-out` is also a Tailwind utility. */
   --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --default-transition-duration: 150ms;
-  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: var(--duration-quick);
+  --default-transition-timing-function: var(--ease-smooth-out);
 }
 
 :root {
   color-scheme: light;
   --radius: 0.25rem;
 
-  /* Neutral ramp, a whisper of cool hue (255). Canvas is off-white so white panels read as panels. */
   --background: oklch(0.976 0.002 255);
   --foreground: oklch(0.18 0.006 255);
   --card: oklch(1 0 0);
@@ -98,42 +87,25 @@
   --accent: oklch(0.935 0.003 255);
   --accent-foreground: oklch(0.18 0.006 255);
   --destructive: oklch(0.53 0.2 27);
-  --warning: oklch(0.93 0.08 85);
-  --warning-foreground: oklch(0.3 0.07 70);
   --border: oklch(0.885 0.004 255);
   --input: oklch(0.62 0.008 255);
   --ring: oklch(0.2 0.006 255);
+  --chart-2: oklch(0.36 0.012 255);
+
+  --warning: oklch(0.93 0.08 85);
+  --warning-foreground: oklch(0.3 0.07 70);
   --stage-on: oklch(0.2 0.006 255);
   --stage-off: oklch(0.83 0.005 255);
-  --chart-1: oklch(0.36 0.012 255);
-  --chart-2: oklch(0.36 0.012 255);
-  --chart-3: oklch(0.52 0.01 255);
-  --chart-4: oklch(0.66 0.008 255);
-  --chart-5: oklch(0.8 0.006 255);
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.18 0.006 255);
-  --sidebar-primary: oklch(0.2 0.006 255);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.935 0.003 255);
-  --sidebar-accent-foreground: oklch(0.18 0.006 255);
-  --sidebar-border: oklch(0.885 0.004 255);
-  --sidebar-ring: oklch(0.2 0.006 255);
 
-  /* Motion tokens (transitions-dev scale), used by name in the rules below and in components. */
+  /* transitions-dev motion tokens */
   --duration-stagger: 40ms;
-  --duration-micro: 80ms;
   --duration-quick: 150ms;
   --duration-fast: 250ms;
-  --duration-medium: 350ms;
-  --duration-slow: 400ms;
-  --distance-micro: 4px;
-  --distance-base: 8px;
   --scale-large: 0.96;
   --scale-medium: 0.97;
   --scale-tiny: 0.99;
 }
 
-/* Composed for low light, not inverted: surfaces step up in lightness as they rise. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
@@ -152,26 +124,15 @@
     --accent: oklch(0.28 0.006 255);
     --accent-foreground: oklch(0.965 0.002 255);
     --destructive: oklch(0.7 0.17 25);
-    --warning: oklch(0.36 0.06 70);
-    --warning-foreground: oklch(0.93 0.06 85);
     --border: oklch(0.31 0.006 255);
     --input: oklch(0.55 0.008 255);
     --ring: oklch(0.92 0.004 255);
+    --chart-2: oklch(0.8 0.012 255);
+
+    --warning: oklch(0.36 0.06 70);
+    --warning-foreground: oklch(0.93 0.06 85);
     --stage-on: oklch(0.965 0.002 255);
     --stage-off: oklch(0.38 0.006 255);
-    --chart-1: oklch(0.8 0.012 255);
-    --chart-2: oklch(0.8 0.012 255);
-    --chart-3: oklch(0.66 0.01 255);
-    --chart-4: oklch(0.52 0.008 255);
-    --chart-5: oklch(0.4 0.006 255);
-    --sidebar: oklch(0.2 0.005 255);
-    --sidebar-foreground: oklch(0.965 0.002 255);
-    --sidebar-primary: oklch(0.965 0.002 255);
-    --sidebar-primary-foreground: oklch(0.18 0.006 255);
-    --sidebar-accent: oklch(0.28 0.006 255);
-    --sidebar-accent-foreground: oklch(0.965 0.002 255);
-    --sidebar-border: oklch(0.31 0.006 255);
-    --sidebar-ring: oklch(0.92 0.004 255);
   }
 }
 
@@ -186,7 +147,6 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-optical-sizing: auto;
   }
   ::selection {
     background-color: var(--foreground);
@@ -203,14 +163,11 @@
 }
 
 /*
- * shadcn theming hooks. These target the primitives' data-slot attributes instead of forking
- * src/components/ui/*. They are unlayered on purpose, so they win over the primitives' utilities.
+ * The rules below are unlayered so they win over the shadcn primitives' utilities without
+ * editing src/components/ui/*.
  */
-/*
- * One focus treatment everywhere: a crisp 2px ink outline, offset 2px, in place of shadcn's
- * half-opacity 3px ring (which disappears against the black primary button). Menu items show focus
- * with their highlight, and dialogs and tabindex=-1 targets take focus programmatically.
- */
+
+/* Replaces shadcn's half-opacity ring, which vanishes against the black primary button. */
 :focus-visible:not(
     [role="menuitem"],
     [role="menuitemradio"],
@@ -228,38 +185,30 @@
   border-radius: var(--radius-sm);
   letter-spacing: 0.01em;
 }
-[data-slot="card"] {
-  box-shadow: none;
-}
+
 [data-slot="table"] {
   font-variant-numeric: tabular-nums;
 }
 thead [data-slot="table-head"] {
   color: var(--muted-foreground);
 }
+/* A table that fills a bordered panel keeps its first and last columns off the edge. */
+.table-panel :is(th, td):first-child {
+  padding-left: 1rem;
+}
+.table-panel :is(th, td):last-child {
+  padding-right: 1rem;
+}
+
+/* Dialogs. tw-animate-css reads the --tw-* variables. */
 [data-slot="dialog-overlay"],
 [data-slot="alert-dialog-overlay"] {
   background-color: rgb(0 0 0 / 0.45);
 }
-[data-slot="dialog-content"],
-[data-slot="alert-dialog-content"] {
-  background-color: var(--popover);
-  color: var(--popover-foreground);
-}
-html [data-sonner-toaster] {
-  font-family: inherit;
-}
-
-/*
- * Overlay motion on the transitions-dev tokens: opens take --duration-fast, closes the quicker
- * --duration-quick, both on --ease-smooth-out. tw-animate-css reads these variables.
- */
 [data-slot="dialog-overlay"],
 [data-slot="alert-dialog-overlay"],
 [data-slot="dialog-content"],
-[data-slot="alert-dialog-content"],
-[data-slot="dropdown-menu-content"],
-[data-slot="dropdown-menu-sub-content"] {
+[data-slot="alert-dialog-content"] {
   --tw-ease: var(--ease-smooth-out);
   &[data-state="open"] {
     --tw-animation-duration: var(--duration-fast);
@@ -270,22 +219,36 @@ html [data-sonner-toaster] {
 }
 [data-slot="dialog-content"],
 [data-slot="alert-dialog-content"] {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
   --tw-enter-scale: var(--scale-large);
   --tw-exit-scale: var(--scale-large);
 }
-/* Menus grow from their trigger (Radix sets the transform origin); no slide. */
+
+/* Menus. Radix sets the transform origin, so they grow from the trigger; no slide. */
 [data-slot="dropdown-menu-content"],
 [data-slot="dropdown-menu-sub-content"] {
+  --tw-ease: var(--ease-smooth-out);
   --tw-enter-scale: var(--scale-medium);
   --tw-exit-scale: var(--scale-tiny);
   --tw-enter-translate-x: 0;
   --tw-enter-translate-y: 0;
+  &[data-state="open"] {
+    --tw-animation-duration: var(--duration-fast);
+  }
+  &[data-state="closed"] {
+    --tw-animation-duration: var(--duration-quick);
+  }
+}
+
+/* Toasts (sonner injects its own styles; `html` outranks them). */
+html [data-sonner-toaster] {
+  font-family: inherit;
 }
 html [data-sonner-toaster] [data-sonner-toast] {
   transition-timing-function: var(--ease-smooth-out);
 }
 
-/* Reduced motion keeps the fades (they carry state) and drops scale and travel. */
 @media (prefers-reduced-motion: reduce) {
   [data-slot="dialog-content"],
   [data-slot="alert-dialog-content"],
