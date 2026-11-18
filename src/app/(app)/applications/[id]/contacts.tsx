@@ -34,9 +34,9 @@ function ContactForm({
 
   return (
     <Form {...form}>
-      <form noValidate className="grid gap-4 rounded-lg border p-4" onSubmit={onSubmit}>
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 font-semibold">{legend}</legend>
+      <form noValidate className="grid gap-4 rounded-lg border bg-card p-4 [li_&]:border-0 [li_&]:p-0" onSubmit={onSubmit}>
+        <fieldset className="grid items-start gap-4 sm:grid-cols-2">
+          <legend className="mb-3 font-semibold">{legend}</legend>
           <TextField control={control} name="name" label="Name" maxLength={LIMITS.name} required />
           <TextField control={control} name="title" label="Role or title" maxLength={LIMITS.title} />
           <TextField control={control} name="email" label="Email" type="email" maxLength={LIMITS.email} />

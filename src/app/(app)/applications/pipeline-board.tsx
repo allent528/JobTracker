@@ -15,9 +15,10 @@ import {
 } from "@dnd-kit/core";
 import { ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
-import { useId, useOptimistic, useState } from "react";
+import { useId, useOptimistic, useState, useSyncExternalStore } from "react";
 
 import { FollowUpBadge } from "@/components/follow-up-badge";
+import { StageRule } from "@/components/stage-rule";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -40,6 +41,22 @@ import { type StatusMove, useChangeStatus } from "./use-change-status";
 
 type BoardProps = { items: PipelineItem[]; today: DateOnly };
 
+// The card settling back on drop: --duration-fast on --ease-smooth-out (globals.css), none with reduced motion.
+const DROP_ANIMATION = { duration: 250, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(REDUCED_MOTION);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(REDUCED_MOTION).matches,
+    () => false,
+  );
+}
+
 function applyMove(items: PipelineItem[], move: StatusMove): PipelineItem[] {
   // The server sets updated_at too, so the card keeps its place when the refreshed list arrives.
   const moved = { status: move.status, days_in_status: 0, updated_at: new Date().toISOString() };
@@ -53,6 +70,7 @@ export function PipelineBoard({ items, today }: BoardProps) {
   const { change } = useChangeStatus(setOptimistic);
   const [showClosed, setShowClosed] = useState(false);
   const [draggingId, setDraggingId] = useState<UniqueIdentifier | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     // A long press starts a drag on touch screens, so a swipe still scrolls the board.
@@ -110,9 +128,9 @@ export function PipelineBoard({ items, today }: BoardProps) {
             <BoardColumn key={status} status={status} cards={cards} today={today} onMove={move} />
           ))}
         </div>
-        <DragOverlay>
+        <DragOverlay dropAnimation={reducedMotion ? null : DROP_ANIMATION}>
           {dragging && (
-            <div className="h-full rotate-2 cursor-grabbing rounded-md border bg-card p-3 shadow-lg">
+            <div className="h-full rotate-1 cursor-grabbing rounded-md border border-input bg-card p-3 shadow-lg motion-reduce:rotate-0">
               <CardSummary item={dragging} today={today} />
             </div>
           )}
@@ -138,19 +156,22 @@ function BoardColumn({ status, cards, today, onMove }: ColumnProps) {
       ref={setNodeRef}
       aria-labelledby={headingId}
       className={cn(
-        "flex w-64 shrink-0 flex-col gap-2 rounded-lg bg-muted/60 p-2 lg:w-auto lg:min-w-56 lg:flex-1",
-        isOver && "ring-2 ring-ring",
+        "flex w-64 shrink-0 flex-col gap-2 rounded-lg border bg-muted p-2 transition-[background-color,box-shadow] lg:w-auto lg:min-w-56 lg:flex-1",
+        isOver && "bg-accent ring-2 ring-ring",
       )}
     >
-      <h2 className="flex items-center justify-between gap-2 px-1 pt-1 text-sm font-semibold">
-        <span id={headingId}>{STATUS_META[status].label}</span>
-        <span className="text-muted-foreground">
-          {cards.length}
-          <span className="sr-only">{cards.length === 1 ? " application" : " applications"}</span>
-        </span>
-      </h2>
+      <div className="grid gap-2 px-1 pt-1 pb-1">
+        <h2 className="flex items-baseline justify-between gap-2 text-sm font-semibold">
+          <span id={headingId}>{STATUS_META[status].label}</span>
+          <span className="font-normal text-muted-foreground tabular-nums">
+            {cards.length}
+            <span className="sr-only">{cards.length === 1 ? " application" : " applications"}</span>
+          </span>
+        </h2>
+        <StageRule status={status} />
+      </div>
       {cards.length === 0 ? (
-        <p className="px-1 py-6 text-center text-sm text-muted-foreground">No applications</p>
+        <p className="rounded-md border border-dashed px-1 py-6 text-center text-sm text-muted-foreground">No applications</p>
       ) : (
         <ul className="grid gap-2">
           {cards.map((item) => (
@@ -171,7 +192,7 @@ function BoardCard({ item, today, onMove }: { item: PipelineItem } & Omit<Column
       ref={setNodeRef}
       {...listeners}
       className={cn(
-        "grid cursor-grab gap-2 rounded-md border bg-card p-3 shadow-xs",
+        "grid cursor-grab gap-3 rounded-md border bg-card p-3 transition-colors hover:border-input",
         isDragging && "opacity-40",
       )}
     >
@@ -193,8 +214,8 @@ function CardSummary({ item, today }: { item: PipelineItem; today: DateOnly }) {
     <span className="grid gap-1">
       <span className="font-medium break-words">{item.company}</span>
       <span className="text-sm break-words text-muted-foreground">{item.role_title}</span>
-      <span className="text-xs text-muted-foreground">{formatDaysInStatus(item.days_in_status)}</span>
-      <span className="flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="mt-1 text-xs text-muted-foreground tabular-nums">{formatDaysInStatus(item.days_in_status)}</span>
+      <span className="flex flex-wrap items-center gap-1.5 text-xs tabular-nums">
         {item.next_follow_up_on ? (
           <>
             <span>Follow up {formatDate(item.next_follow_up_on)}</span>

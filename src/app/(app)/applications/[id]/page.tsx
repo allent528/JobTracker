@@ -1,7 +1,9 @@
+import { ChevronLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { StageRule } from "@/components/stage-rule";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,8 +26,12 @@ export const metadata: Metadata = { title: "Application · JobTracker" };
 
 export default function ApplicationPage({ params }: PageProps<"/applications/[id]">) {
   return (
-    <div className="grid max-w-5xl gap-6">
-      <Link href={APPLICATIONS_PATH} className="text-sm font-medium underline underline-offset-4 justify-self-start">
+    <div className="mx-auto grid w-full max-w-5xl grid-cols-[minmax(0,1fr)] gap-6">
+      <Link
+        href={APPLICATIONS_PATH}
+        className="-ml-1 inline-flex items-center gap-1 justify-self-start rounded-sm pr-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ChevronLeftIcon aria-hidden="true" className="size-4" />
         All applications
       </Link>
       <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
@@ -64,14 +70,17 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
   ];
 
   return (
-    <article className="grid gap-8">
-      <header className="grid gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+    <article className="grid grid-cols-[minmax(0,1fr)] gap-10">
+      <header className="grid gap-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <StatusBadge status={app.status} />
           {archived && <Badge variant="outline">Archived</Badge>}
+          <StageRule status={app.status} className="w-32" />
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight break-words">{app.company}</h1>
-        <p className="text-lg break-words text-muted-foreground">{app.role_title}</p>
+        <div className="grid gap-1">
+          <h1 className="text-title break-words">{app.company}</h1>
+          <p className="text-lg break-words text-muted-foreground">{app.role_title}</p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
             <Link href={editApplicationPath(app.id)}>Edit</Link>
@@ -81,21 +90,21 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
         </div>
       </header>
 
-      <section aria-labelledby="status-heading" className="grid gap-3 rounded-lg border p-4">
-        <h2 id="status-heading" className="text-lg font-semibold">
+      <section aria-labelledby="status-heading" className="grid gap-3 rounded-lg border bg-card p-4 sm:p-5">
+        <h2 id="status-heading" className="text-heading">
           Status
         </h2>
         <StatusControl id={app.id} status={app.status} />
       </section>
 
       <section aria-labelledby="details-heading" className="grid gap-3">
-        <h2 id="details-heading" className="text-lg font-semibold">
+        <h2 id="details-heading" className="text-heading">
           Details
         </h2>
-        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[max-content_1fr]">
+        <dl className="divide-y rounded-lg border bg-card">
           {details.map(([label, value]) => (
-            <div key={label} className="grid gap-1 sm:col-span-2 sm:grid-cols-subgrid">
-              <dt className="text-sm text-muted-foreground">{label}</dt>
+            <div key={label} className="grid gap-1 px-4 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:gap-6">
+              <dt className="text-sm text-muted-foreground sm:pt-px">{label}</dt>
               <dd className="break-words">{value || <span className="text-muted-foreground">Not set</span>}</dd>
             </div>
           ))}
@@ -104,7 +113,7 @@ async function ApplicationDetail({ params }: Pick<PageProps<"/applications/[id]"
 
       {app.description && (
         <section aria-labelledby="description-heading" className="grid gap-3">
-          <h2 id="description-heading" className="text-lg font-semibold">
+          <h2 id="description-heading" className="text-heading">
             Description
           </h2>
           <p className="break-words whitespace-pre-wrap">{app.description}</p>

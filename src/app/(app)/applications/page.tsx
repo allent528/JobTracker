@@ -27,8 +27,8 @@ const VIEW_LABELS = { board: "Board", table: "Table" } as const satisfies Record
 export default function ApplicationsPage({ searchParams }: PageProps<"/applications">) {
   return (
     <section className="grid grid-cols-[minmax(0,1fr)] gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight">Applications</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <h1 className="text-title">Applications</h1>
         <Button asChild>
           <Link href={NEW_APPLICATION_PATH}>New application</Link>
         </Button>
@@ -51,15 +51,15 @@ async function Pipeline({ searchParams }: Pick<PageProps<"/applications">, "sear
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-      <nav aria-label="Pipeline view" className="flex gap-1 justify-self-start rounded-lg bg-muted p-1">
+      <nav aria-label="Pipeline view" className="flex justify-self-start rounded-lg border bg-muted p-0.5">
         {PIPELINE_VIEWS.map((v) => (
           <Link
             key={v}
             href={pipelineViewPath(v)}
             aria-current={v === view ? "page" : undefined}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-              v === view && "bg-background text-foreground shadow-sm",
+              "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+              v === view && "bg-card text-foreground shadow-sm",
             )}
           >
             {VIEW_LABELS[v]}
@@ -67,7 +67,7 @@ async function Pipeline({ searchParams }: Pick<PageProps<"/applications">, "sear
         ))}
       </nav>
       {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+        <p className="rounded-lg border border-dashed bg-card p-8 text-center text-muted-foreground">
           No applications yet. Add one to get started.
         </p>
       ) : (

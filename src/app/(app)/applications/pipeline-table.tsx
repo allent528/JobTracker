@@ -106,57 +106,59 @@ export function PipelineTable({ items, timeZone }: { items: PipelineItem[]; time
         {rows.length === 1 ? "1 application" : `${rows.length} applications`}
       </p>
 
-      <Table aria-label="Applications">
-        <TableHeader>
-          <TableRow>
-            {COLUMNS.map(({ key, label }) => (
-              <SortableHead key={key} column={key} label={label} sort={sort} onSort={setSort} />
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
+      <div className="rounded-lg border bg-card [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
+        <Table aria-label="Applications">
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={COLUMNS.length} className="py-6 text-center text-muted-foreground">
-                No applications match these filters.
-              </TableCell>
+              {COLUMNS.map(({ key, label }) => (
+                <SortableHead key={key} column={key} label={label} sort={sort} onSort={setSort} />
+              ))}
             </TableRow>
-          ) : (
-            rows.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">
-                  <Link
-                    href={applicationPath(item.id)}
-                    className="underline-offset-4 hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                  >
-                    {item.company}
-                  </Link>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={COLUMNS.length} className="py-8 text-center text-muted-foreground">
+                  No applications match these filters.
                 </TableCell>
-                <TableCell>{item.role_title}</TableCell>
-                <TableCell>
-                  <span className="flex items-center gap-1.5">
-                    <StatusBadge status={item.status} />
-                    {item.archived_at && <Badge variant="outline">Archived</Badge>}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {item.date_applied ? (
-                    formatDate(item.date_applied)
-                  ) : (
-                    <>
-                      <span aria-hidden="true" className="text-muted-foreground">
-                        —
-                      </span>
-                      <span className="sr-only">Not set</span>
-                    </>
-                  )}
-                </TableCell>
-                <TableCell>{formatDate(dateInTimeZone(item.updated_at, timeZone))}</TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              rows.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={applicationPath(item.id)}
+                      className="underline-offset-4 hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                    >
+                      {item.company}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{item.role_title}</TableCell>
+                  <TableCell>
+                    <span className="flex items-center gap-1.5">
+                      <StatusBadge status={item.status} />
+                      {item.archived_at && <Badge variant="outline">Archived</Badge>}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {item.date_applied ? (
+                      formatDate(item.date_applied)
+                    ) : (
+                      <>
+                        <span aria-hidden="true" className="text-muted-foreground">
+                          —
+                        </span>
+                        <span className="sr-only">Not set</span>
+                      </>
+                    )}
+                  </TableCell>
+                  <TableCell>{formatDate(dateInTimeZone(item.updated_at, timeZone))}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

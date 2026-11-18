@@ -27,7 +27,7 @@ export const metadata: Metadata = { title: "Stats · JobTracker" };
 export default function StatsPage({ searchParams }: PageProps<"/stats">) {
   return (
     <section className="mx-auto grid w-full max-w-5xl grid-cols-[minmax(0,1fr)] gap-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Stats</h1>
+      <h1 className="text-title">Stats</h1>
       <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
         <StatsContent searchParams={searchParams} />
       </Suspense>
@@ -43,25 +43,25 @@ async function StatsContent({ searchParams }: Pick<PageProps<"/stats">, "searchP
     <>
       <IncludeArchivedToggle checked={includeArchived} />
       {stats.statusCounts.total === 0 ? (
-        <p className="rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+        <p className="rounded-lg border border-dashed bg-card p-8 text-center text-muted-foreground">
           No applications to count yet.
         </p>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2 lg:gap-6">
+          <StatSection id="response-rate" title="Response rate" className="lg:col-span-2">
+            <ResponseRateTile rate={stats.responseRate} />
+          </StatSection>
           <StatSection id="status-counts" title="Applications by status">
             <StatusCountsTable counts={stats.statusCounts} />
           </StatSection>
-          <StatSection id="response-rate" title="Response rate">
-            <ResponseRateTile rate={stats.responseRate} />
+          <StatSection id="stage-durations" title="Average days in each stage">
+            <StageDurationsTable durations={stats.stageDurations} />
           </StatSection>
           <StatSection id="weekly" title={`Applications per week (last ${STATS_WEEKS} weeks)`} className="lg:col-span-2">
             <p className="text-sm text-muted-foreground">
               By date applied, weeks starting Monday, from {formatDate(stats.fromDay)}.
             </p>
             <WeeklyChart weeks={stats.weeks} />
-          </StatSection>
-          <StatSection id="stage-durations" title="Average days in each stage" className="lg:col-span-2">
-            <StageDurationsTable durations={stats.stageDurations} />
           </StatSection>
         </div>
       )}
@@ -83,9 +83,9 @@ function StatSection({
   return (
     <section
       aria-labelledby={`${id}-heading`}
-      className={cn("grid min-w-0 content-start gap-3 rounded-lg border bg-card p-4 text-card-foreground", className)}
+      className={cn("grid min-w-0 content-start gap-3 rounded-lg border bg-card p-4 text-card-foreground sm:p-5", className)}
     >
-      <h2 id={`${id}-heading`} className="text-xl font-semibold">
+      <h2 id={`${id}-heading`} className="text-heading">
         {title}
       </h2>
       {children}
@@ -98,7 +98,7 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
   const group = (label: string, rows: StatusCount[]) => (
     <>
       <TableRow className="hover:bg-transparent">
-        <TableHead scope="rowgroup" colSpan={2} className="text-xs tracking-wide text-muted-foreground uppercase">
+        <TableHead scope="rowgroup" colSpan={2} className="h-9 pt-3 text-xs font-medium text-muted-foreground">
           {label}
         </TableHead>
       </TableRow>
@@ -112,7 +112,7 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
               <span className="w-8 text-right tabular-nums">{applications}</span>
               <span aria-hidden className="flex-1">
                 <span
-                  className="block h-2 rounded-sm"
+                  className="block h-2 rounded-[1px]"
                   style={{ width: `${(applications / max) * 100}%`, backgroundColor: STATS_MARK_COLOR }}
                 />
               </span>
@@ -152,9 +152,9 @@ function ResponseRateTile({ rate }: { rate: ResponseRate }) {
     return <p className="text-sm text-muted-foreground">No applications have reached {reachedLabel} yet.</p>;
   }
   return (
-    <div className="grid gap-1">
-      <p className="text-4xl font-semibold tabular-nums">{rate.percent}%</p>
-      <p className="text-sm text-muted-foreground">
+    <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+      <p className="text-figure tabular-nums">{rate.percent}%</p>
+      <p className="max-w-prose text-sm text-muted-foreground">
         {rate.responded} of {rate.reached} applications that reached {reachedLabel} got to {respondedLabel} or later.
       </p>
     </div>

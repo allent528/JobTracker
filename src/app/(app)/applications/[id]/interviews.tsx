@@ -64,9 +64,9 @@ function InterviewForm<T>({
 
   return (
     <Form {...form}>
-      <form noValidate className="grid gap-4 rounded-lg border p-4" onSubmit={onSubmit}>
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 font-semibold">{legend}</legend>
+      <form noValidate className="grid gap-4 rounded-lg border bg-card p-4 [li_&]:border-0 [li_&]:p-0" onSubmit={onSubmit}>
+        <fieldset className="grid items-start gap-4 sm:grid-cols-2">
+          <legend className="mb-3 font-semibold">{legend}</legend>
           <SelectField control={control} name="kind" label="Type" options={INTERVIEW_KINDS} labels={INTERVIEW_KIND_LABELS} />
           <SelectField
             control={control}

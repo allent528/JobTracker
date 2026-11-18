@@ -9,6 +9,7 @@ import { getStoredTimeZone } from "@/lib/profile";
 import { STATS_PATH } from "@/lib/stats";
 
 import { signOut } from "./actions";
+import { MainNavActive, MainNavLinks } from "./main-nav";
 import { TimeZoneDetector } from "./time-zone-detector";
 
 const NAV_LINKS = [
@@ -21,24 +22,29 @@ const NAV_LINKS = [
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <header className="border-b">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <Link href={HOME_PATH} className="font-semibold tracking-tight">
+      <header className="border-b bg-card">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 px-4 sm:flex-nowrap">
+          <Link
+            href={HOME_PATH}
+            className="flex h-12 items-center text-[0.9375rem] font-semibold tracking-[-0.01em] sm:h-14"
+          >
             JobTracker
           </Link>
-          <nav aria-label="Main" className="order-last flex w-full gap-4 text-sm sm:order-none sm:w-auto">
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link key={href} href={href} className="text-muted-foreground hover:text-foreground">
-                {label}
-              </Link>
-            ))}
+          {/* Below sm the nav takes its own row under the brand and the sign-out button. */}
+          <nav
+            aria-label="Main"
+            className="order-last -mx-4 flex w-[calc(100%+2rem)] border-t px-2 sm:order-none sm:mx-0 sm:w-auto sm:px-0 sm:flex-1 sm:self-stretch sm:border-t-0 sm:[&>a]:h-14"
+          >
+            <Suspense fallback={<MainNavLinks links={NAV_LINKS} />}>
+              <MainNavActive links={NAV_LINKS} />
+            </Suspense>
           </nav>
           <Suspense fallback={null}>
             <UserMenu />
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pt-6 pb-12 sm:pt-10">{children}</main>
       <Suspense fallback={null}>
         <DetectTimeZoneIfUnset />
       </Suspense>

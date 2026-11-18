@@ -57,9 +57,9 @@ export function ApplicationForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={onSubmit} noValidate className="grid gap-8">
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-lg font-semibold">Job</legend>
+      <form onSubmit={onSubmit} noValidate className="grid gap-8 rounded-lg border bg-card p-4 sm:p-6">
+        <fieldset className="grid items-start gap-4 sm:grid-cols-2">
+          <legend className="mb-3 text-heading">Job</legend>
           <TextField control={control} name="company" label="Company" maxLength={LIMITS.company} required />
           <TextField
             control={control}
@@ -114,8 +114,8 @@ export function ApplicationForm({
           />
         </fieldset>
 
-        <fieldset className="grid gap-4 sm:grid-cols-3">
-          <legend className="mb-2 text-lg font-semibold">Salary range</legend>
+        <fieldset className="grid items-start gap-4 sm:grid-cols-3">
+          <legend className="mb-3 text-heading">Salary range</legend>
           <TextField control={control} name="salary_min" label="Minimum" inputMode="numeric" />
           <TextField control={control} name="salary_max" label="Maximum" inputMode="numeric" />
           <TextField
@@ -128,8 +128,8 @@ export function ApplicationForm({
           />
         </fieldset>
 
-        <fieldset className="grid gap-4 sm:grid-cols-2">
-          <legend className="mb-2 text-lg font-semibold">Follow-up</legend>
+        <fieldset className="grid items-start gap-4 sm:grid-cols-2">
+          <legend className="mb-3 text-heading">Follow-up</legend>
           <TextField control={control} name="next_follow_up_on" label="Next follow-up" type="date" />
           <TextField
             control={control}
@@ -144,7 +144,9 @@ export function ApplicationForm({
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-lg font-semibold">Description</FormLabel>
+              <FormLabel>
+                <span className="mb-1 text-heading">Description</span>
+              </FormLabel>
               <FormControl>
                 <Textarea rows={8} maxLength={LIMITS.description} {...field} />
               </FormControl>
@@ -153,7 +155,7 @@ export function ApplicationForm({
           )}
         />
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <div className="-mx-4 -mb-4 flex flex-col-reverse gap-3 border-t px-4 py-4 sm:-mx-6 sm:-mb-6 sm:flex-row sm:justify-end sm:px-6">
           <Button asChild variant="outline">
             <Link href={cancelHref}>Cancel</Link>
           </Button>

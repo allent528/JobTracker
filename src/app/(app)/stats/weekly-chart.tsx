@@ -44,11 +44,11 @@ export function WeeklyChart({ weeks }: { weeks: WeekCount[] }) {
               />
             }
           />
-          <Bar dataKey="applications" fill="var(--color-applications)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="applications" fill="var(--color-applications)" radius={[2, 2, 0, 0]} />
         </BarChart>
       </ChartContainer>
       <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show as table</summary>
+        <summary className="cursor-pointer rounded-sm text-muted-foreground transition-colors hover:text-foreground">Show as table</summary>
         <Table>
           <TableHeader>
             <TableRow>

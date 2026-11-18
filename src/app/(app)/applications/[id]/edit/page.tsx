@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: "Edit application · JobTracker" };
 
 export default function EditApplicationPage({ params }: PageProps<"/applications/[id]/edit">) {
   return (
-    <section className="grid max-w-3xl gap-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Edit application</h1>
+    <section className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
+      <h1 className="text-title">Edit application</h1>
       <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
         <EditForm params={params} />
       </Suspense>
