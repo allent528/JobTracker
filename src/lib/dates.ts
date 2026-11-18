@@ -2,12 +2,15 @@
 
 export const FALLBACK_TIME_ZONE = "UTC";
 
+/** `YYYY-MM-DD` (plus `extraDays`) as midnight UTC on that date. */
+function utcDate(date: string, extraDays = 0): Date {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + extraDays));
+}
+
 /** `YYYY-MM-DD` as "Nov 14, 2026". Date-only, so no time zone shift applies. */
 export function formatDate(date: string): string {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(
-    new Date(Date.UTC(year, month - 1, day)),
-  );
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" }).format(utcDate(date));
 }
 
 /** A timestamptz as "Nov 14, 2026, 9:05 AM" in `timeZone`. */
@@ -63,8 +66,20 @@ export function daysBetween(from: DateOnly, to: DateOnly): number {
 }
 
 export function addDays(date: DateOnly, days: number): DateOnly {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+  return utcDate(date, days).toISOString().slice(0, 10);
+}
+
+/** The Monday on or before `date` (ISO weeks start on Monday). */
+export function startOfWeek(date: DateOnly): DateOnly {
+  const weekday = utcDate(date).getUTCDay(); // 0 = Sunday
+  return addDays(date, -((weekday + 6) % 7));
+}
+
+/** `YYYY-MM-DD` as "Nov 16". */
+export function formatMonthDay(date: DateOnly): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(
+    utcDate(date),
+  );
 }
 
 /** How far `timeZone`'s wall clock is ahead of UTC at `instant`, in milliseconds. */

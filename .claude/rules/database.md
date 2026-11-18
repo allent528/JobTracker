@@ -48,6 +48,9 @@ Any change here follows the `db-migration` skill.
 - Transitions are not enforced (D6): no transition checks in SQL.
 - `profiles` row is created by a trigger on `auth.users` insert. `time_zone` is null until the app saves the browser's zone on the first signed-in page load (or the owner picks one in `/settings`); server code falls back to UTC. Non-null values are validated by a `before insert or update of time_zone` trigger against `pg_timezone_names` (a check constraint can't query a table), plus Zod in the app.
 - Stats (F9) live in SQL views or functions (D13). Views use `security_invoker = true` so RLS applies.
+- The `stats_*` functions (`20261118025658_create_stats_functions`) are `stable security invoker` with `set search_path = ''`, and each filters `user_id = (select auth.uid())` itself. Execute is revoked from public, anon and service_role and granted to authenticated only.
+- They return raw facts. Status lists arrive as `text[]` parameters from `src/lib/status.ts` (capped at 32 entries, `too_many_statuses` / 22023), and days arrive as `date` parameters.
+- Never hard-code statuses in them, and never read `now()` or `current_date` (those are UTC, not the owner's day).
 - Develop against the local stack: `npx supabase db reset` must apply every migration cleanly before anything goes to prod. Push to the single hosted project (JobTracker (`skcsrdyqsqkinrrwtdyh`)) only with the owner's OK. Regenerate types from local.
 
 ## Storage policies

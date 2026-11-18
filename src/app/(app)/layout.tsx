@@ -6,6 +6,7 @@ import { APPLICATIONS_PATH } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
 import { HOME_PATH, SETTINGS_PATH } from "@/lib/auth-routes";
 import { getStoredTimeZone } from "@/lib/profile";
+import { STATS_PATH } from "@/lib/stats";
 
 import { signOut } from "./actions";
 import { TimeZoneDetector } from "./time-zone-detector";
@@ -13,6 +14,7 @@ import { TimeZoneDetector } from "./time-zone-detector";
 const NAV_LINKS = [
   { href: HOME_PATH, label: "Reminders" },
   { href: APPLICATIONS_PATH, label: "Applications" },
+  { href: STATS_PATH, label: "Stats" },
   { href: SETTINGS_PATH, label: "Settings" },
 ] as const;
 
