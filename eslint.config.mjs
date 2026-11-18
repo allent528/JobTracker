@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "blob-report/**",
     "playwright/.cache/**",
+    // Vendored Claude skills (third-party scripts), not app code.
+    ".claude/skills/**",
   ]),
 ]);
 
