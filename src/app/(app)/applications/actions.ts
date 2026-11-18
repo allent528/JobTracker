@@ -1,12 +1,12 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { type ActionResult, parseOr } from "@/lib/action-result";
 import { APPLICATIONS_PATH, applicationPath, initialStatus } from "@/lib/applications";
 import { getCurrentUser } from "@/lib/auth";
 import { writeErrorMessage } from "@/lib/db-errors";
+import { revalidateApplication, revalidateApplicationLists } from "@/lib/revalidate";
 import { deleteOwnApplication, updateOwnApplication } from "@/lib/owned-rows";
 import {
   type ApplicationFormValues,
@@ -18,16 +18,6 @@ import {
   statusChangeSchema,
 } from "@/lib/schemas/application";
 import { createClient } from "@/lib/supabase/server";
-
-/** Every page that lists applications. Step 7 adds the home page (`/`) here. */
-function revalidatePipeline() {
-  revalidatePath(APPLICATIONS_PATH);
-}
-
-function revalidateApplication(id: string) {
-  revalidatePipeline();
-  revalidatePath(applicationPath(id));
-}
 
 export async function createApplication(input: ApplicationFormValues): Promise<ActionResult<never>> {
   await getCurrentUser();
@@ -42,7 +32,7 @@ export async function createApplication(input: ApplicationFormValues): Promise<A
     .single();
   if (error) return { ok: false, error: writeErrorMessage(error) };
 
-  revalidatePipeline();
+  revalidateApplicationLists();
   redirect(applicationPath(data.id));
 }
 
@@ -99,6 +89,6 @@ export async function deleteApplication(id: string): Promise<ActionResult<never>
   const result = await deleteOwnApplication(user.id, parsedId.data);
   if (!result.ok) return result;
 
-  revalidatePipeline();
+  revalidateApplicationLists();
   redirect(APPLICATIONS_PATH);
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Control } from "react-hook-form";
 
+import { EditableRow, FormButtons, SelectField, TextAreaField, TextField, useSectionForm } from "@/components/section-ui";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormDescription, FormField, FormItem, FormMessage } from "@/components/ui/form";
@@ -25,7 +26,6 @@ import { INTERVIEWING_STATUS, type Status, STATUS_META, suggestsInterviewing } f
 
 import { useChangeStatus } from "../use-change-status";
 import { createInterview, deleteInterview, updateInterview } from "./actions";
-import { EditableRow, FormButtons, SelectField, TextAreaField, TextField, useSectionForm } from "./section-ui";
 
 const LIMITS = TEXT_LIMITS.interviews;
 

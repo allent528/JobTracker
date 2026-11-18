@@ -146,3 +146,15 @@
 - **Root cause:** `Date.UTC(26, …)` means 1926, and `datetime-local` can't show years below 1000 either.
 - **Fix:** The schema accepts years 1900–2999, with unit tests at both ends.
 - **Lesson:** Bound years in any date input that goes through `Date.UTC`.
+
+## 2026-11-15: A heading plus an inline count span ran together in the accessible name
+- **Mistake:** The e2e looked for a region named "Today (2)" and found none, though the page showed that text.
+- **Root cause:** The heading was `Today` followed by `<span class="ml-2">(2)</span>` on the next line. JSX drops that line break, and margin isn't text, so the accessible name was "Today(2)". Screen readers read it the same way.
+- **Fix:** `{label}{" "}<span>…</span>`.
+- **Lesson:** Visual spacing (margin, gap) doesn't add a space to accessible names; put a real space between text nodes. Recorded in ui.md.
+
+## 2026-11-15: Intl's time zone list leaves out UTC and uses old canonical names
+- **Mistake:** Planned to validate time zones with `Intl.supportedValuesOf("timeZone").includes(value)`.
+- **Root cause:** Node's list has no `UTC` (our fallback) and returns `Asia/Calcutta`, not `Asia/Kolkata`, while browsers may report either. Newer Intl versions also accept offset zones like `+05:00`, which Postgres's `pg_timezone_names` doesn't list.
+- **Fix:** `isSupportedTimeZone` checks an IANA-shaped name and that `Intl.DateTimeFormat` accepts it; the settings list adds UTC and the saved zone to Intl's list. The DB trigger stays the final check.
+- **Lesson:** Validate zones by "Intl can format in it" plus a name shape, not by membership in `supportedValuesOf`.

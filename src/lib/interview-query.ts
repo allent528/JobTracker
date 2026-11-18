@@ -16,23 +16,22 @@ export type UpcomingInterview = {
   application: { id: string; company: string; role_title: string; status: Status };
 };
 
-/** Pending rounds in [from, until) (ISO instants) on unarchived applications, soonest first. */
+/** Pending rounds in [from, until) (ISO instants; no `from` means no lower bound) on unarchived applications, soonest first. */
 export function selectUpcomingInterviews(
   supabase: SupabaseClient<Database>,
   userId: string,
-  range: { from: string; until: string },
+  range: { from?: string; until: string },
 ) {
-  return supabase
+  const query = supabase
     .from("interviews")
     .select(
       "id, kind, scheduled_at, duration_minutes, location, applications!inner(id, company, role_title, status, archived_at)",
     )
     .eq("user_id", userId)
     .eq("outcome", PENDING_OUTCOME)
-    .gte("scheduled_at", range.from)
     .lt("scheduled_at", range.until)
-    .is("applications.archived_at", null)
-    .order("scheduled_at");
+    .is("applications.archived_at", null);
+  return (range.from === undefined ? query : query.gte("scheduled_at", range.from)).order("scheduled_at");
 }
 
 type UpcomingRow = NonNullable<Awaited<ReturnType<typeof selectUpcomingInterviews>>["data"]>[number];

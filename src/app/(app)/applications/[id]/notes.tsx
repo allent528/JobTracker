@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { EditableRow, FormButtons, TextAreaField, useSectionForm } from "@/components/section-ui";
 import { Form } from "@/components/ui/form";
 import type { ActionResult } from "@/lib/action-result";
 import type { Note } from "@/lib/detail";
@@ -9,7 +10,6 @@ import { TEXT_LIMITS } from "@/lib/limits";
 import { EMPTY_NOTE_FORM, type NoteFormValues, noteSchema } from "@/lib/schemas/note";
 
 import { createNote, deleteNote, updateNote } from "./actions";
-import { EditableRow, FormButtons, TextAreaField, useSectionForm } from "./section-ui";
 
 function NoteForm({
   label,

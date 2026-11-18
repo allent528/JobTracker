@@ -19,6 +19,7 @@ export default defineConfig({
   reporter: "list",
   use: {
     baseURL,
+    timezoneId: "UTC",
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

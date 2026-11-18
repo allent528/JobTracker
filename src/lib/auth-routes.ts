@@ -2,6 +2,7 @@ export const PUBLIC_PATHS = ["/login", "/auth/confirm"] as const;
 
 export const LOGIN_PATH = "/login";
 export const HOME_PATH = "/";
+export const SETTINGS_PATH = "/settings";
 
 /** Query keys on /login: where to go after sign-in, and why the user landed there. */
 export const NEXT_PARAM = "next";

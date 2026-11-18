@@ -311,3 +311,45 @@
 - Move `TextField`, `ConfirmDeleteButton` and the action hook to a shared module. Rebuild the application form's `TextField`, `DeleteButton`, `useChangeStatus` and `ArchiveButton` (which doesn't catch rejections) on them.
 - Move the contact and interview form-value mappers next to their schemas.
 - E2E only runs in UTC; time-zone conversion is covered by unit tests. Add a desktop-width run of the detail flow.
+
+## 2026-11-15: Launch step 7 (Reminders home page, F8)
+**Status:** Done, pending owner review (PR 7, branch `feat/reminders-home`). Review fixes applied 2026-11-17. No migration; nothing touched prod.
+**What was done**
+- `/` is now the reminders home page and replaces the step 5 redirect. It has three lists: Overdue, Today and Next 7 days. Each combines follow-ups and pending interviews, bucketed in the owner's `profiles.time_zone` (D11). Each list is a labelled region with a count and an empty message. A line under the heading says "Today is <date> in <zone>" and links to settings.
+  - Follow-up items: a Follow-up label, status badge, company and role (linking to the detail page), the date with "3 days overdue", "Today", "Tomorrow" or "In 4 days", the note, and a Mark done button.
+  - Interview items: an Interview label, kind, status badge, company and role, time with zone, duration, and location (a link only if http(s)). Overdue rounds say "Outcome not recorded yet".
+- Mark done opens a dialog titled "Mark follow-up done", prefilled with the date 7 days out and the current note.
+- Saving with a date sets the next follow-up. Saving with a blank date clears the follow-up and its note in one step. It's one `completeFollowUp` action and one update of `next_follow_up_on` and `follow_up_note`.
+- Time zone (F8, D11):
+  - Detection: the `(app)` layout renders `<TimeZoneDetector />` only while `profiles.time_zone` is null. It sends the browser's zone to `detectTimeZone`, which updates only where the zone is still null and then revalidates every page, so the open page re-renders in the owner's zone. A failed profile read in the layout skips detection instead of breaking the shell.
+  - `/settings`: a select of Intl's zones plus UTC and the saved zone. `updateTimeZone` (in `settings/actions.ts`) saves it and revalidates every page, and skips both when the zone didn't change.
+  - Validation: Zod `isSupportedTimeZone` (an IANA-shaped name Intl can format in; offsets like `+05:00` are rejected), then the DB trigger. A 22023 error shows "That time zone isn't recognized. Pick another one." from `src/lib/profile-writes.ts`.
+  - A stored zone that Postgres accepts but Intl can't format in (such as `Factory`) falls back to UTC on every page (`effectiveTimeZone`), and settings asks the owner to pick another.
+- Main nav in the header: Reminders, Applications, Settings (a second row below `sm`). Sign-in lands on `/` by every path: the code, the magic link, the `safeNextPath` fallback, and `/login` while signed in.
+- Data: `reminderWindow(today)` returns one half-open bound, `untilDay`. `listDueFollowUps(untilDay)` (`src/lib/reminder-query.ts`) and `listUpcomingInterviews(untilDay)` have no lower bound, so every pending past round shows as overdue. `bucketReminders` classifies days with `followUpState`; `interviewDueState` was removed.
+- Revalidation is all in `src/lib/revalidate.ts`: `revalidateApplicationLists` (renamed from `revalidatePipeline`; now includes `/`), `revalidateApplication`, `revalidateApplicationChild` (adds `/` for interviews) and `revalidateAllPages`.
+- `section-ui.tsx` moved to `src/components/`, and `useSectionForm`'s `onDone` is optional. shadcn `dialog` added.
+**Files:** `src/app/(app)/{page.tsx,layout.tsx,actions.ts,follow-up-done.tsx,time-zone-detector.tsx}`, `src/app/(app)/settings/{page.tsx,time-zone-form.tsx,actions.ts}`, `src/app/(app)/applications/{actions.ts,[id]/actions.ts,[id]/contacts.tsx,[id]/interviews.tsx,[id]/notes.tsx}`, `src/components/section-ui.tsx` (moved), `src/components/ui/dialog.tsx`, `src/lib/{reminders,reminder-query,revalidate,time-zones,profile,profile-writes,dates,follow-ups,owned-rows,interview-query,application-queries,auth-routes}.ts`, `src/lib/schemas/{follow-up,settings}.ts`, unit tests beside them, `tests/rls/reminder-query.test.ts`, `tests/e2e/{home,auth,applications}.spec.ts`, `tests/e2e/support/{fixtures,local-env}.ts`, `playwright.config.ts`, `.claude/rules/{ui,server-actions,testing,database}.md`, `docs/learnings.md`
+**Tests**
+- Unit: bucketing (day 7 in and day 8 out; interviews split at midnight in the owner's zone, not UTC; the US fall-back day; Auckland, Kiritimati and Pago Pago across the date line; ordering), `reminderWindow` across month, year and leap boundaries, `addDays`, `formatDueIn`, `startOfDayInstant` on Santiago's midnight-skipping DST day, the follow-up and time-zone schemas, `isSupportedTimeZone`, `effectiveTimeZone`, `timeZoneOptions`.
+- Local stack (`tests/rls/reminder-query.test.ts`): due follow-ups (the exclusive `untilDay`, overdue included, archived and unset excluded, closed status included, order). Another user's follow-ups are never returned, even when queried with the owner's id, and another user can't clear the owner's follow-up. Interviews with no lower bound include old pending rounds only.
+- E2E `tests/e2e/home.spec.ts`:
+  - At 375px, seeded follow-ups and interviews land in the right lists. Archived, passed and day-8 items are excluded; a rejected application's follow-up is kept. Links work and the page doesn't scroll sideways.
+  - Mark done sets the next one (the date 7 days out is prefilled), then a blank date clears the follow-up and its note in one step, checked in the database.
+  - With Playwright `timezoneId: "Pacific/Pago_Pago"`, the open page switches to that zone right after sign-in, without a reload. Changing to Kiritimati in settings moves the buckets, and detection doesn't overwrite it on reload.
+  - A second user sees empty lists and none of the owner's text.
+  - The buckets, Mark done and time zone tests (home page, dialog and settings) assert no browser console errors or warnings.
+  - `signInAs` now clears the profile's zone and ends on `/`; Playwright runs in `timezoneId: "UTC"`.
+**Checks:** typecheck, lint, `npm test`, build with the CI placeholder env, `npm run test:e2e`, `npm run test:rls` (run on its own): all pass; counts are in the PR. Verification PASS and security review SAFE (live cross-user probes refused) on the first version; five code-quality passes applied in the second commit.
+**Decisions / defaults**
+- Lists: Overdue covers any day before today, with no lower bound. Next 7 days runs from tomorrow through 7 days out. Interviews fall on their calendar day in the owner's zone, so an interview earlier today stays in Today.
+- Archived applications are excluded (the PRD hides them from lists by default).
+- Closed statuses are not excluded: the PRD doesn't say to hide them, and a follow-up the owner set is a reminder they asked for. This matches step 6's `listUpcomingInterviews` (pending only, archived excluded). Flagged for the owner.
+- Interviews count while their outcome is pending. A past pending round shows under Overdue until an outcome is recorded on the detail page. The home page has no interview actions (the PRD lists none).
+- Order within a list: by day first. On the same day, interviews come first by time, then follow-ups by company and role.
+- Mark done suggests the next follow-up 7 days out (the PRD's example) and keeps the note by default. There is no separate snooze or reschedule action (not in the PRD); the date can be changed in the dialog or the edit form.
+- Detection runs on the first signed-in page load while the zone is null (the PRD's "first sign-in"), not in the sign-in action, so the code and magic-link paths behave the same. A zone the server rejects is ignored silently, and UTC stays until one is picked in settings.
+- `isSupportedTimeZone` doesn't require Intl's resolved name to match the input: Intl resolves aliases (`Asia/Kolkata` to `Asia/Calcutta`), so that check would reject valid names.
+**Follow-ups**
+- A page left open past midnight keeps the server's "today" until the next refresh (same as the board, D11).
+- Deferred from review: rebuild the application form on the shared form pieces and split `section-ui.tsx` into form fields and the editable row; optionally rename `reminder-query.ts` to `follow-up-query.ts`; reject Intl-unsupported zone names in the database (next migration); no rate limit on settings writes.
