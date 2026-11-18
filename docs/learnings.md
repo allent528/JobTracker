@@ -170,3 +170,9 @@
 - **Root cause:** `signInAs` clears `profiles.time_zone`, so the first signed-in page runs `detectTimeZone`, which revalidates every page. On a cold dev server that action finished after the test had moved on, and the refresh re-rendered the board from the database.
 - **Fix:** `signInAs` now waits until the zone is saved and the network is idle before returning.
 - **Lesson:** A fixture that triggers background work (detection, revalidation) waits for it to finish. Run a failing e2e on its own and on `main` before calling it a flake.
+
+## 2026-11-18: Supabase CLI 3.x targets the local database by default
+- **Mistake:** The `db-migration` skill's prod step was `npx supabase db push --yes`, written for CLI 2.x, where a linked project was the default target.
+- **Root cause:** In CLI 3.x (`supabase` 3.1 in package.json), `db push`, `db query`, `db advisors`, `db lint`, `migration list` and `gen types` all say "Local by default. Pass --remote for the linked project". The old command would have pushed to the local stack and reported success while prod stayed empty.
+- **Fix:** The skill and `docs/deploy.md` use `--remote` on every prod command (plus `--yes` for hosted changes and `--skip-vault`). Found with `--help` while preparing step 9.
+- **Lesson:** Check a CLI's `--help` for its default target before writing a prod command, and after any major version bump. Recorded in `.claude/rules/database.md`.

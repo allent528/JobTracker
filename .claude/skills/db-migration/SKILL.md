@@ -19,24 +19,32 @@ Targets: the **local** Supabase stack in Docker (develop and verify here: `npx s
 - Every SECURITY DEFINER function: `set search_path = ''`, fully qualified names, its own `auth.uid()`/ownership check, `revoke execute … from public, anon`, and grant only to the right role.
 - Raise stable error codes (`raise exception 'snake_code' using errcode = 'P0001'`) and map them to user-facing copy in the app.
 
-## 3. Review before applying
+## 3. Verify locally, then review
+- On the local stack (these commands have no `--remote`, so they never reach prod):
+  ```bash
+  npx supabase db reset                                  # applies every migration + seed locally
+  npm run db:types                                       # regenerate types from local
+  npm run test:rls                                       # RLS checks, local stack only
+  npx supabase db advisors --type all --level info
+  npx supabase db lint --schema public,private
+  ```
 - Run the **security-reviewer** agent on the migration SQL. Fix what it finds.
-- `npx supabase db push --dry-run` to confirm only the intended file(s) will apply.
+- `npx supabase db push --remote --skip-vault --dry-run` to confirm only the intended file(s) will apply to prod. Supabase CLI 3.x targets the **local** database by default; prod commands need `--remote` (see `docs/deploy.md`). `--skip-vault` is a guard: the project has no Vault secrets configured, and it stops a push from ever sending any.
 
 ## 4. Ask the owner
 Apply only after explicit approval. Use AskUserQuestion with a plain-English summary of what changes, whether existing data is affected, and options: apply / apply + pre-approve small follow-up fixes for this step / show SQL first. Approval for one step doesn't carry over to the next.
 
 ## 5. Apply and regenerate
 ```bash
-npx supabase db push --yes          # add --include-seed only when seed.sql changed
-npm run db:types                    # regenerate the generated database types
+npx supabase db push --remote --skip-vault --yes   # prod; never --include-seed (seed.sql is fake data)
+npm run db:types                    # regenerate the generated database types (from local)
 npm run typecheck
 ```
 
 ## 6. Verify live
-- Add checks to the live access-control script (e.g. `scripts/check-rls.mjs`, run as `npm run check:rls`) for every new rule, written **as the attacker** (the forbidden action fails) as well as the happy path. Keep fixtures realistic.
-- Run it. All must pass.
-- Supabase MCP `get_advisors` (security, then performance). Explain each finding as intended or fixed.
+- Add checks to the RLS suite (`tests/rls/`, run as `npm run test:rls`, **local stack only**, never against prod) for every new rule, written **as the attacker** (the forbidden action fails) as well as the happy path. Keep fixtures fake.
+- Run it locally. All must pass.
+- Prod checks are read-only: `npx supabase db advisors --remote --type all --level info` and `npx supabase db lint --remote --schema public,private` (the Supabase MCP `get_advisors` gives the same advisors), plus the catalog spot checks in `docs/deploy.md` B6. Explain each finding as intended or fixed.
 
 ## 7. Record
 - `docs/progress.md` entry: what the migration does, checks added, advisor results.
