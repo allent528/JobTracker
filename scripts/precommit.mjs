@@ -8,7 +8,8 @@ import { existsSync } from 'node:fs';
 // Add cheap project checks here (each runs with `node <script>`); keep the hook under a few seconds.
 const FAST_CHECKS = [];
 
-const git = (...args) => execFileSync('git', args, { encoding: 'utf8' });
+// The default 1 MB buffer overflows (ENOBUFS) on large staged diffs, e.g. vendored skills.
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 const staged = git('diff', '--cached', '--name-only', '--diff-filter=ACMR').split('\n').filter(Boolean);
 const problems = [];
 
