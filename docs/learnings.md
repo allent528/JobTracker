@@ -206,3 +206,33 @@
 - **Root cause:** Unknown. It may be the same tool-layer rewriting as the 2026-11-14 heredoc entries.
 - **Fix:** Appended with the Edit tool.
 - **Lesson:** Write prose with Write or Edit, not heredocs.
+
+## 2026-11-18: React wiped a field filled while hydration was still running (WebKit)
+- **Mistake:** In WebKit, under parallel load, the new-application e2e filled Company and Role title right after `page.goto`, and the form then showed "Enter the company." with Company empty. Waiting for the input's `__reactFiber$` key first didn't help.
+- **Root cause:** React attaches the fiber to a node while it renders the hydration pass, and commits later. A controlled input filled in between is set back to its state value (`""`) at the commit. WebKit with several workers took 2 to 4 seconds to get from first paint to that commit; Chromium and Firefox were done before the test typed.
+- **Fix:** `expectHydrated(locator)` in `tests/e2e/support/fixtures.ts` waits for the fiber and for its root's `pendingLanes` to be 0 (no render work left). With it, 8 parallel WebKit repeats went from 0/8 to 8/8.
+- **Lesson:** After a full page load, wait for React to commit, not just for the HTML, before typing into a controlled form. The same thing can happen to a person on a slow phone; it's React behaviour, not a WebKit bug, so it's noted rather than changed in the app.
+
+## 2026-11-18: Firefox downloaded the font twice and warned about the preload
+- **Mistake:** Firefox e2e failed on a console warning: "The resource at …archivo….woff2 preloaded with link preload was not used within a few seconds."
+- **Root cause:** `next/font` preloads the font twice, as an HTTP `Link: rel=preload` header and as a `<link rel="preload">` element from the RSC payload. Chromium and WebKit fetch it once; Firefox fetched it twice (probe: two `font` requests) and reported one copy as unused.
+- **Fix:** `preload: false` on the `localFont` call. The stylesheet starts one fetch, `display: swap` with the metric-matched fallback covers the short wait, and every engine now makes one request.
+- **Lesson:** Check font requests per engine, not only in Chromium. Recorded in ui.md.
+
+## 2026-11-18: WebKit logs a cancelled prefetch as an access-control error
+- **Mistake:** WebKit specs failed on console errors like "…/stats?_rsc=… due to access control checks." though nothing had failed.
+- **Root cause:** `page.goto` cancels Next's in-flight route prefetches, and WebKit reports a cancelled fetch that way. Chromium and Firefox say nothing.
+- **Fix:** The shared `collectConsoleErrors` in `fixtures.ts` ignores exactly that shape for an `_rsc=` URL and keeps everything else.
+- **Lesson:** Filter an engine's known noise by its exact text in one helper, never by console type or engine.
+
+## 2026-11-18: A drag released right after the last move dropped one column early
+- **Mistake:** The board drag e2e dropped "Drag Co" on Applied (Firefox) or on Interviewing (WebKit, under load) instead of Screening.
+- **Root cause:** dnd-kit works out the column under the pointer after the move event, so `mouse.up()` straight after the last `mouse.move` can use the previous column. The target's position was also measured before the drag started.
+- **Fix:** Start the drag, wait for "Picked up Drag Co." in the live region, measure the target then, move, and release once it says "Drag Co is over Screening.".
+- **Lesson:** Synchronise drag tests on the board's announcements, not on mouse timing.
+
+## 2026-11-18: The dev server couldn't carry three browsers at once
+- **Mistake:** The first three-browser run against `npm run dev` failed 26 of 60, Chromium included. Firefox Server Actions stayed on "Saving…" past their timeouts, and Firefox logged "The execution of microtasks on this page was reordered to avoid unsafe execution." on many pages.
+- **Root cause:** Load: the dev server compiles and serves unbundled chunks to every worker. The microtask warning came only from the dev build; it never appeared against `next start`.
+- **Fix:** Playwright's `webServer` runs `npm run build && npm run start`, and the test timeout is 60s for the long phone-width flows.
+- **Lesson:** Run cross-browser e2e against a production build. A dev-only console warning isn't an app bug, but check it against `next start` before deciding.

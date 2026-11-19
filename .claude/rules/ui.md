@@ -27,7 +27,7 @@ For new screens or visual changes, use the `web-design-engineer` skill and the `
 - Motion uses the transitions-dev tokens on `:root` (`--duration-quick` 150ms closes and hovers, `--duration-fast` 250ms opens, `--ease-smooth-out` everywhere; Tailwind's default transition is already 150ms on that curve). Write `duration-(--duration-fast)`, not a raw number. Every new animation needs a `prefers-reduced-motion` path that drops movement but keeps fades.
 - Focus is one 2px `--ring` outline with a 2px offset, set globally; don't add `focus-visible:ring-*` to new elements.
 - `StageRule` (`src/components/stage-rule.tsx`) is the stage indicator; it reads its order from `ACTIVE_STATUSES` and fills every segment for the end of the forward path (Accepted).
-- Font: Archivo (OFL), self-hosted with `next/font/local` in `src/app/layout.tsx`. Never load fonts, icons or scripts from a CDN, and use no third-party brand assets.
+- Font: Archivo (OFL), self-hosted with `next/font/local` in `src/app/layout.tsx`, with `preload: false` (Next's preload sent a Link header and a `<link>` tag, and Firefox fetched the font twice and warned). Never load fonts, icons or scripts from a CDN, and use no third-party brand assets.
 
 ## Must / must not
 - Every page works at 375px width; the board scrolls horizontally on small screens, and the page body never does.
