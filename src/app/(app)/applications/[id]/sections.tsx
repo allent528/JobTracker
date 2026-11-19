@@ -1,3 +1,4 @@
+import { Empty } from "@/components/section-ui";
 import { Badge } from "@/components/ui/badge";
 import type { StatusEvent } from "@/lib/application-queries";
 import { INTERVIEW_KIND_LABELS, INTERVIEW_OUTCOME_LABELS, PENDING_OUTCOME } from "@/lib/closed-sets";
@@ -12,8 +13,8 @@ import { AddNoteForm, NoteItem } from "./notes";
 
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={`${id}-heading`} className="grid gap-3">
-      <h2 id={`${id}-heading`} className="text-lg font-semibold">
+    <section aria-labelledby={`${id}-heading`} className="grid grid-cols-[minmax(0,1fr)] gap-3">
+      <h2 id={`${id}-heading`} className="text-heading">
         {title}
       </h2>
       {children}
@@ -21,15 +22,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-muted-foreground">{children}</p>;
-}
-
 function Fields({ items }: { items: [label: string, value: React.ReactNode][] }) {
   const shown = items.filter(([, value]) => value);
   if (shown.length === 0) return null;
   return (
-    <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[max-content_1fr]">
+    <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
       {shown.map(([label, value]) => (
         <div key={label} className="grid gap-1 sm:col-span-2 sm:grid-cols-subgrid">
           <dt className="text-sm text-muted-foreground">{label}</dt>
@@ -57,11 +54,11 @@ export function NotesSection({ applicationId, notes, timeZone }: { applicationId
       {notes.length === 0 ? (
         <Empty>No notes yet.</Empty>
       ) : (
-        <ol className="grid gap-4" aria-label="Notes, newest first">
+        <ol className="divide-y rounded-lg border bg-card" aria-label="Notes, newest first">
           {notes.map((note) => {
             const added = formatDateTime(note.created_at, timeZone);
             return (
-              <li key={`${note.id}:${note.updated_at}`} className="border-b pb-4 last:border-b-0">
+              <li key={`${note.id}:${note.updated_at}`} className="p-4">
                 <NoteItem row={note} label={`note added ${added}`}>
                   <p className="break-words whitespace-pre-wrap">{note.body}</p>
                   <p className="text-sm text-muted-foreground">
@@ -91,7 +88,7 @@ export function ContactsSection({ applicationId, contacts }: { applicationId: st
       ) : (
         <ul className="grid gap-3" aria-label="Contacts">
           {contacts.map((contact) => (
-            <li key={`${contact.id}:${contact.updated_at}`} className="rounded-lg border p-4">
+            <li key={`${contact.id}:${contact.updated_at}`} className="rounded-lg border bg-card p-4">
               <ContactItem row={contact} label={`contact ${contact.name}`}>
                 <div>
                   <h3 className="font-semibold break-words">{contact.name}</h3>
@@ -140,7 +137,7 @@ export function InterviewsSection({
             const kind = INTERVIEW_KIND_LABELS[interview.kind];
             const names = interviewerNames(interview, contacts);
             return (
-              <li key={`${interview.id}:${interview.updated_at}`} className="rounded-lg border p-4">
+              <li key={`${interview.id}:${interview.updated_at}`} className="rounded-lg border bg-card p-4">
                 <InterviewItem row={interview} label={`${kind} interview on ${when}`} contacts={picker} timeZone={timeZone}>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-semibold">{kind}</h3>
@@ -175,15 +172,15 @@ export function InterviewsSection({
 export function HistorySection({ history, timeZone }: { history: StatusEvent[]; timeZone: string }) {
   return (
     <Section id="history" title="Status history">
-      <ol className="grid gap-2" aria-label="Status changes, newest first">
+      <ol className="divide-y rounded-lg border bg-card" aria-label="Status changes, newest first">
         {history.map((event) => (
-          <li key={event.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-b pb-2 last:border-b-0">
+          <li key={event.id} className="flex flex-wrap justify-between gap-x-4 gap-y-1 px-4 py-2.5 text-sm">
             <span>
               {event.from_status === null
                 ? `Created as ${STATUS_META[event.to_status].label}`
                 : `${STATUS_META[event.from_status].label} → ${STATUS_META[event.to_status].label}`}
             </span>
-            <time dateTime={event.changed_at} className="text-sm text-muted-foreground">
+            <time dateTime={event.changed_at} className="text-muted-foreground tabular-nums">
               {formatDateTime(event.changed_at, timeZone)}
             </time>
           </li>

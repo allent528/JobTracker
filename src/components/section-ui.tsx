@@ -23,6 +23,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea";
 import { type ActionResult, UNREACHABLE_ERROR } from "@/lib/action-result";
 import { toastResult } from "@/lib/toast-result";
+import { cn } from "@/lib/utils";
 
 /** A rejected call (offline, server down) would otherwise reach the error boundary. */
 export function useSectionAction() {
@@ -244,5 +245,47 @@ export function EditableRow({
         <ConfirmDeleteButton label={`Delete ${label}`} {...remove} />
       </div>
     </div>
+  );
+}
+
+/** Panel around an add form; the same form inside a list row needs no chrome of its own. */
+export const ADD_FORM_PANEL = "rounded-lg border bg-card p-4";
+
+/** A titled section in a bordered panel. The heading's id is `${id}-heading`. */
+export function PanelSection({
+  id,
+  title,
+  className,
+  children,
+}: {
+  id: string;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={`${id}-heading`}
+      className={cn("grid min-w-0 content-start gap-3 rounded-lg border bg-card p-4 text-card-foreground sm:p-5", className)}
+    >
+      <h2 id={`${id}-heading`} className="text-heading">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+/** Empty-state message: `row` inside a section or list, `page` when a whole view has nothing. */
+export function Empty({ size = "row", children }: { size?: "row" | "page"; children: React.ReactNode }) {
+  return (
+    <p
+      className={cn(
+        "rounded-lg border border-dashed text-muted-foreground",
+        size === "row" ? "px-4 py-3 text-sm" : "bg-card p-8 text-center",
+      )}
+    >
+      {children}
+    </p>
   );
 }

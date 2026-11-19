@@ -176,3 +176,33 @@
 - **Root cause:** In CLI 3.x (`supabase` 3.1 in package.json), `db push`, `db query`, `db advisors`, `db lint`, `migration list` and `gen types` all say "Local by default. Pass --remote for the linked project". The old command would have pushed to the local stack and reported success while prod stayed empty.
 - **Fix:** The skill and `docs/deploy.md` use `--remote` on every prod command (plus `--yes` for hosted changes and `--skip-vault`). Found with `--help` while preparing step 9.
 - **Lesson:** Check a CLI's `--help` for its default target before writing a prod command, and after any major version bump. Recorded in `.claude/rules/database.md`.
+
+## 2026-11-18: Dark mode never applied
+- **Mistake:** The shadcn setup shipped dark tokens under `.dark` and a `dark:` variant on `.dark *`, and earlier dark screenshots added the class by hand. Nothing in the app ever set it, so users always got the light theme.
+- **Root cause:** shadcn's default assumes a theme provider (next-themes) toggles the class, and this app has none.
+- **Fix:** `@custom-variant dark (@media (prefers-color-scheme: dark))`, with the dark tokens inside the same media query. Dark screenshots use Playwright's `colorScheme: "dark"`.
+- **Lesson:** Check that a theme really switches through a browser setting (OS or emulated), not by injecting the class. Recorded in ui.md.
+
+## 2026-11-18: `cn` dropped a custom font-size role
+- **Mistake:** `<FormLabel className="text-heading">` rendered at the label's default 14px.
+- **Root cause:** `cn` merges conflicting utilities but doesn't know the custom `text-heading` theme role is a font size, so the component's own `text-sm` won.
+- **Fix:** Put the role on an inner `<span>`.
+- **Lesson:** Custom type roles go on plain elements or an inner span, not through a component's `className`. Recorded in ui.md.
+
+## 2026-11-18: shadcn's focus ring disappears on the primary button
+- **Mistake:** Keyboard focus on "New application" was nearly invisible.
+- **Root cause:** shadcn draws focus as a 3px box-shadow ring at 50% of `--ring`. With an ink-black primary button and an ink ring, the ring blends into the button.
+- **Fix:** One global unlayered `:focus-visible` rule: a 2px solid `--ring` outline, offset 2px, with `--tw-ring-shadow` cleared. Menu items, dialogs and `tabindex="-1"` targets are excluded.
+- **Lesson:** After a palette change, check focus on every button variant, not just on inputs.
+
+## 2026-11-18: Stopping `npm start` left `next start` running
+- **Mistake:** After stopping the background `npm start` and rebuilding, the next `npm start` failed with EADDRINUSE, and the old server kept serving the replaced build.
+- **Root cause:** On Windows, stopping the npm process doesn't stop its `next start` child.
+- **Fix:** Find and stop the process on the port: `Get-NetTCPConnection -LocalPort 3000 -State Listen`, then `Stop-Process` on its owner.
+- **Lesson:** After stopping a dev or prod server, confirm the port is free before starting another or running e2e.
+
+## 2026-11-18: A long heredoc failed to parse in the Bash tool
+- **Mistake:** Appending two doc entries with `cat >> file <<'EOF'` failed with "unexpected EOF while looking for matching `''", and nothing was written.
+- **Root cause:** Unknown. It may be the same tool-layer rewriting as the 2026-11-14 heredoc entries.
+- **Fix:** Appended with the Edit tool.
+- **Lesson:** Write prose with Write or Edit, not heredocs.

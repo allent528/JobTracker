@@ -410,7 +410,7 @@
 - One query per stat, all from SQL functions (no views): each needs parameters (the window, the toggle, the status lists).
 **Follow-ups**
 - Step 9: push this migration to prod with the other eight (owner approval). After the push, check `proacl` on prod for the four `stats_*` functions: execute for authenticated only, none for anon or service_role.
-- Design pass: the response-rate tile leaves empty space at desktop width.
+- Design pass: the response-rate tile leaves empty space at desktop width. (Fixed in the 2026-11-18 design pass.)
 - Not a concern now: PostgREST's 1000-row cap. The per-day query returns at most 84 rows, and the others return one row per status.
 
 ## 2026-11-18: Launch step 9: deploy prep, waiting for owner
@@ -439,12 +439,48 @@
 **Open owner decisions**
 - Follow-ups on applications in a closed status still show on the home page (step 7 default). Keep or hide?
 - Stats: Applied → Rejected counts as reached but not responded (step 8 default, the PRD read literally). Should a rejection count as a response?
-- Dark mode: the dark theme exists (`.dark` styles) but nothing turns it on, so prod is always light. Add a toggle, follow the system setting, or stay light-only?
+- Dark mode: works since the design pass (PR #9) and follows the OS setting. Still open: add an in-app toggle, or keep it OS-only?
 - Custom SMTP now or later.
 - Read-only Supabase MCP (`.mcp.json` still has write features pointing at prod), open since step 1.
 - Before launch per the step 1 decision: add Firefox/WebKit to Playwright, or launch on Chromium-only e2e?
 - Keep-alive for the paused-project issue (use weekly, upgrade, or a scheduled ping), default: none.
 **Follow-ups (unchanged, not blocking launch)**
 - Reject Intl-unsupported time-zone names (such as `Factory`) in the database in the next migration; the app already falls back to UTC.
-- Atomic interview + links RPC; shared form pieces; response-rate tile layout at desktop width.
+- Atomic interview + links RPC; shared form pieces. (The response-rate tile layout is fixed by the design pass, PR #9.)
 - After the push, record advisor results, `proacl` for the four `stats_*` functions and type drift here.
+
+## 2026-11-18: Design pass (whole app)
+**Status:** Done, pending owner review (branch `feat/design-pass`). No migration, no behaviour or copy changes; nothing touched prod.
+**What was done**
+- New visual system, documented in `DESIGN.md`: restrained, high-contrast, engineering-precise. Neutral greys with a faint cool cast, near-black ink, 4px radius, hairline borders and no decorative shadows, one sans family with a fixed scale (`text-title`, `text-heading`, `text-figure`), and colour only for meaning (overdue red, due-today amber, destructive red).
+- Dark mode now applies. Before, the `dark:` variant and the dark tokens hung off a `.dark` class that nothing set, so the app was always light. `dark:` is now a `prefers-color-scheme` media variant, and the dark tokens are a designed palette (surfaces lighten as they rise), not an inversion. Native controls follow through `color-scheme`.
+- Font: Archivo, SIL Open Font License 1.1 (Omnibus-Type), self-hosted with `next/font/local` from `src/app/fonts/archivo-latin-wght-normal.woff2` (Latin subset, variable 100–900, 35 KB, taken from the `@fontsource-variable/archivo` 5.3.0 package; licence in `src/app/fonts/Archivo-OFL.txt`, no Reserved Font Name). No network at build or run time.
+- Signature element: `StageRule` (`src/components/stage-rule.tsx`), a segmented bar along the active stages, filled up to the current one. It heads each board column and sits beside the status on the application page. It's decorative (`aria-hidden`), since the status is always written beside it. Accepted fills every segment; Rejected, Withdrawn and Ghosted fill none. Its segments fill one after another (40ms stagger) when the status changes.
+- Shell: the header is a card-coloured bar with a bottom border, holding the wordmark, the nav and sign-out. The nav now marks the current section with `aria-current="page"` and a 2px underline. It's a client component (`(app)/main-nav.tsx`) inside Suspense.
+- Pages, restyled within their existing structure:
+  - Reminders: each bucket is one bordered panel with ruled rows. Mark done sits on the right from `sm`. The Overdue count turns red when it isn't zero.
+  - Applications: a segmented Board/Table switch. Board columns get the stage rule and tabular counts. Cards are quieter, with an edge that darkens on hover. The dragged card tilts 1° and settles in 250ms. The table sits in a bordered panel.
+  - Application page: a back link with a chevron and the stage rule beside the status badge. Details are a ruled two-column list, and notes and history are ruled panels. Inline edit forms no longer nest a second box inside the row.
+  - New and Edit: one panel with a footer bar for Cancel and Save. Field grids are top-aligned.
+  - Stats: the response rate is a full-width band, which fixes the dead space noted in step 8. The two tables pair up below it, and the weekly chart is full width. Marks use `--chart-2`, at least 9.7:1 against the card in both themes.
+  - Settings, login and the error page: panels on the new tokens.
+- shadcn primitives are untouched. Theming goes through tokens and unlayered `[data-slot]` rules in `globals.css`: badge radius, muted table headers, popover-coloured dialogs, overlay motion, and the toast font and easing. `shadow-xs` and `shadow-sm` are flat. Unused shadcn tokens (`--chart-1/3/4/5`, `--sidebar-*`) are gone.
+- Shared pieces in `src/components/section-ui.tsx`: `PanelSection` (titled bordered panel: application status, settings, stats sections), `Empty` (`row` and `page` empty states) and `ADD_FORM_PANEL` (the panel around the add contact and add interview forms; the same forms inside a list row have no chrome). `.table-panel` in `globals.css` pads a panelled table's edge columns.
+- Motion uses the transitions-dev tokens (`--duration-quick` 150ms, `--duration-fast` 250ms, `--ease-smooth-out`, `--scale-large/medium/tiny`). Dialogs and menus open in 250ms and close in 150ms, and menus grow from their trigger with no slide. Tailwind's default transition is 150ms on the same curve. Reduced motion keeps the fades and drops scale, tilt, stagger and the drop animation.
+- Focus: one global 2px outline in `--ring`, offset 2px. It replaces shadcn's half-opacity ring, which vanished against the black primary button.
+- `.gitattributes` marks `*.woff2` binary. ESLint now ignores `.claude/skills/**`: the skills vendored in this branch's first commit added 93 lint warnings from their bundled scripts.
+**Files:** `DESIGN.md`, `src/app/globals.css`, `src/app/layout.tsx`, `src/app/fonts/{archivo-latin-wght-normal.woff2,Archivo-OFL.txt}`, `src/components/{stage-rule,follow-up-badge}.tsx`, `src/app/(app)/{layout,main-nav,page,error}.tsx`, `src/app/(app)/applications/{page,pipeline-board,pipeline-table,application-form}.tsx`, `src/app/(app)/applications/new/page.tsx`, `src/app/(app)/applications/[id]/{page,sections,contacts,interviews}.tsx`, `src/app/(app)/applications/[id]/edit/page.tsx`, `src/app/(app)/settings/page.tsx`, `src/app/(app)/stats/{page,weekly-chart,chart-color}.tsx`, `src/app/(auth)/login/page.tsx`, `eslint.config.mjs`, `.gitattributes`, `.claude/rules/ui.md`, `docs/learnings.md`
+**Checks:** typecheck, lint (0 problems), `npm test` (192), build with the CI placeholder env and `npm run test:rls` (43/43) pass. `npm run test:e2e`: 20/20 on 5 of 6 full runs, with no selector changes needed; the sixth, right after a build, had 1 failure whose output was not kept; later runs all passed, as did 60 serial repeats of every spec. After the review fixes, every gate was run again serially: see the review-fixes note below. Screenshots of every page in light and dark at 375px and 1280px came from a production build with fake data and aren't committed. Every page had a clean console and no horizontal scroll, and the dialog's computed animation is `enter 0.25s cubic-bezier(0.22, 1, 0.36, 1)`. Contrast was computed from the OKLCH tokens; DESIGN.md lists the ratios.
+**Decisions / defaults**
+- Colour approach: restrained neutrals plus semantic state colours only, with no brand accent colour.
+- Deliberately not copied from the reference design language: its typeface, icons, marque, name, colours and components. Only its qualities were borrowed (restraint, contrast, tight spacing, small radii, quiet motion), and every value here is original.
+- The impeccable skill's launcher, concept roll and review agents weren't run: the brief pinned the direction and ruled out the launcher. Its critique and audit checklists were applied by hand to the screenshots.
+- The font is the Latin subset only, so other scripts fall back to the system sans. If names with Central European characters look off, add the latin-ext file with a `unicode-range` declaration.
+**Follow-ups**
+- The application page shows a "Status" heading above a "Status" select label. That's existing copy, left as is.
+- Owner to decide: keep dark mode OS-only, or add a toggle later (it would need the `.dark` class variant back).
+**Review fixes (same day)**
+- The stage rule fills every segment for Accepted. The nav underline has no transition under reduced motion. Dead `focus-visible:ring` classes are gone.
+- Shared `PanelSection`, `Empty` and `ADD_FORM_PANEL`. Contact and interview forms have no chrome of their own. The application form's footer is a sibling with its own padding. The nav takes its link height from the link class, and its width no longer depends on the header's padding. A `.table-panel` rule replaces four arbitrary selectors.
+- Tokens: the default transition reads `--duration-quick` and `--ease-smooth-out`. Unused motion tokens, `--chart-1/3/4/5` and `--sidebar-*` are deleted, and `shadow-sm` is flat (the Board/Table segment no longer has a shadow). The wordmark is `text-base`, chart bars share `MARK_RADIUS`, and narration comments are trimmed. `globals.css` is regrouped (focus, badge, table, dialogs, menus, toasts, one reduced-motion block). DESIGN.md is brought in line with the code.
+- Gates on the final code, run one after another: typecheck, lint, `npm test` (192), the CI build and `npm run test:rls` (43/43) pass. `npm run test:e2e`: two runs on the final code failed, the first with 3 failures and the second with 1. Every failure was a timeout in a long phone-width test or in the sign-in fixture's time-zone wait, and those runs were slower (50s against 38s). The next four full runs passed 20/20: two normal runs, one right after a fresh build and one with a single worker. The failing applications test also passed 3 serial repeats on its own (7 to 11s each against its 30s limit). Not reproduced; logged as a load flake. Screenshots were recaptured on the final code.

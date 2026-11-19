@@ -285,7 +285,7 @@ Free Supabase projects pause after about a week without activity.
 - **Install on Vercel:** the `prepare` script now runs `scripts/install-hooks.mjs`, which skips when there's no git checkout. The old `git config core.hooksPath .githooks` would fail `npm ci` on a build machine without a `.git` folder.
 - **Lockfile:** includes the Linux x64 binaries (next-swc, lightningcss, tailwind oxide) since step 1, and pins `react-is` to 19.3.0 for recharts. `npm ci` installs exactly that.
 - **`next.config.ts`:** `cacheComponents` and `partialPrefetching` are standard Next 16 features that Vercel supports. `logging.serverFunctions: false` only affects the dev terminal; production doesn't log Server Function arguments either way. The Turbopack CSS rule is what CI's `next build` already uses.
-- **Fonts:** none to download. The app uses system font stacks (`globals.css`), so the build makes no font requests.
-- **Pending design pass (PR #9, awaiting owner review):** it adds a self-hosted OFL font and dark mode that follows the OS setting. If PR #9 merges first, update the Fonts line above and the dark-mode decision in `docs/progress.md` to match.
+- **Fonts:** none to download. The app self-hosts Archivo (SIL OFL 1.1) through `next/font/local` from a committed file (`src/app/fonts/archivo-latin-wght-normal.woff2`, licence beside it), so the build and the browser make no font requests to a third party.
+- **Theme:** dark mode follows the OS setting (`prefers-color-scheme`); there's no in-app toggle and nothing to configure on Vercel.
 - **Env:** the app reads only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`src/lib/supabase/env.ts`). There's no hard-coded localhost and no `emailRedirectTo`; the magic link comes from the Site URL (A7).
 - **Build without secrets:** `next build` passes with the CI placeholder env, so it reaches no database at build time.

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { Empty } from "@/components/section-ui";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { listDueFollowUps, listUpcomingInterviews } from "@/lib/application-queries";
@@ -23,6 +24,7 @@ import {
   reminderWindow,
 } from "@/lib/reminders";
 import { isHttpUrl } from "@/lib/schemas/fields";
+import { cn } from "@/lib/utils";
 
 import { FollowUpDoneButton } from "./follow-up-done";
 
@@ -39,8 +41,8 @@ const BUCKET_COPY = {
 
 export default function HomePage() {
   return (
-    <section className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Reminders</h1>
+    <section className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-1">
+      <h1 className="text-title">Reminders</h1>
       <Suspense fallback={<p className="text-muted-foreground">Loading…</p>}>
         <Reminders />
       </Suspense>
@@ -62,27 +64,34 @@ async function Reminders() {
           Change time zone
         </Link>
       </p>
-      {REMINDER_BUCKETS.map((bucket) => (
-        <section key={bucket} aria-labelledby={`${bucket}-heading`} className="grid gap-3">
-          <h2 id={`${bucket}-heading`} className="text-xl font-semibold">
-            {BUCKET_COPY[bucket].label}{" "}
-            <span className="ml-1 text-base font-normal text-muted-foreground">({buckets[bucket].length})</span>
-          </h2>
-          {buckets[bucket].length === 0 ? (
-            <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-              {BUCKET_COPY[bucket].empty}
-            </p>
-          ) : (
-            <ul className="grid gap-3">
-              {buckets[bucket].map((reminder) => (
-                <li key={reminder.key} className="rounded-lg border bg-card p-4 text-card-foreground">
-                  <ReminderItem reminder={reminder} bucket={bucket} today={today} timeZone={timeZone} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ))}
+      <div className="mt-7 grid grid-cols-[minmax(0,1fr)] gap-8">
+        {REMINDER_BUCKETS.map((bucket) => (
+          <section key={bucket} aria-labelledby={`${bucket}-heading`} className="grid gap-3">
+            <h2 id={`${bucket}-heading`} className="text-heading">
+              {BUCKET_COPY[bucket].label}{" "}
+              <span
+                className={cn(
+                  "ml-0.5 font-normal text-muted-foreground tabular-nums",
+                  bucket === "overdue" && buckets[bucket].length > 0 && "text-destructive",
+                )}
+              >
+                ({buckets[bucket].length})
+              </span>
+            </h2>
+            {buckets[bucket].length === 0 ? (
+              <Empty>{BUCKET_COPY[bucket].empty}</Empty>
+            ) : (
+              <ul className="divide-y rounded-lg border bg-card text-card-foreground">
+                {buckets[bucket].map((reminder) => (
+                  <li key={reminder.key} className="p-4">
+                    <ReminderItem reminder={reminder} bucket={bucket} today={today} timeZone={timeZone} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
+      </div>
     </>
   );
 }
@@ -118,17 +127,19 @@ function FollowUpItem({
   today: DateOnly;
 }) {
   return (
-    <div className="grid gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">Follow-up</Badge>
-        <StatusBadge status={followUp.status} />
+    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-6">
+      <div className="grid gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">Follow-up</Badge>
+          <StatusBadge status={followUp.status} />
+        </div>
+        <ApplicationLink id={followUp.id} company={followUp.company} role={followUp.role_title} />
+        <p className="text-sm tabular-nums">
+          {formatDate(followUp.next_follow_up_on)}
+          <span className="text-muted-foreground"> · {formatDueIn(followUp.next_follow_up_on, today)}</span>
+        </p>
+        {followUp.follow_up_note && <p className="text-sm break-words whitespace-pre-wrap">{followUp.follow_up_note}</p>}
       </div>
-      <ApplicationLink id={followUp.id} company={followUp.company} role={followUp.role_title} />
-      <p className="text-sm">
-        {formatDate(followUp.next_follow_up_on)}
-        <span className="text-muted-foreground"> · {formatDueIn(followUp.next_follow_up_on, today)}</span>
-      </p>
-      {followUp.follow_up_note && <p className="text-sm break-words whitespace-pre-wrap">{followUp.follow_up_note}</p>}
       <div>
         <FollowUpDoneButton
           applicationId={followUp.id}
@@ -162,7 +173,7 @@ function InterviewItem({
         company={interview.application.company}
         role={interview.application.role_title}
       />
-      <p className="text-sm">
+      <p className="text-sm tabular-nums">
         {formatDateTimeWithZone(interview.scheduled_at, timeZone)}
         {interview.duration_minutes !== null && (
           <span className="text-muted-foreground"> · {interview.duration_minutes} min</span>

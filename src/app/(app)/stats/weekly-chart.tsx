@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDate, formatMonthDay } from "@/lib/dates";
 import { STATS_WEEKS, type WeekCount } from "@/lib/stats";
 
-import { STATS_MARK_COLOR } from "./chart-color";
+import { MARK_RADIUS, STATS_MARK_COLOR } from "./chart-color";
 
 const chartConfig = {
   applications: { label: "Applications", color: STATS_MARK_COLOR },
@@ -44,11 +44,11 @@ export function WeeklyChart({ weeks }: { weeks: WeekCount[] }) {
               />
             }
           />
-          <Bar dataKey="applications" fill="var(--color-applications)" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="applications" fill="var(--color-applications)" radius={[MARK_RADIUS, MARK_RADIUS, 0, 0]} />
         </BarChart>
       </ChartContainer>
       <details className="text-sm">
-        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Show as table</summary>
+        <summary className="cursor-pointer rounded-sm text-muted-foreground transition-colors hover:text-foreground">Show as table</summary>
         <Table>
           <TableHeader>
             <TableRow>

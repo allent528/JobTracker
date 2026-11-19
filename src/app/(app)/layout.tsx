@@ -9,6 +9,7 @@ import { getStoredTimeZone } from "@/lib/profile";
 import { STATS_PATH } from "@/lib/stats";
 
 import { signOut } from "./actions";
+import { MainNavActive, MainNavLinks } from "./main-nav";
 import { TimeZoneDetector } from "./time-zone-detector";
 
 const NAV_LINKS = [
@@ -21,24 +22,25 @@ const NAV_LINKS = [
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <>
-      <header className="border-b">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <Link href={HOME_PATH} className="font-semibold tracking-tight">
+      <header className="border-b bg-card">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-6 px-4 sm:flex-nowrap">
+          <Link href={HOME_PATH} className="flex h-12 items-center font-semibold tracking-tight sm:h-14">
             JobTracker
           </Link>
-          <nav aria-label="Main" className="order-last flex w-full gap-4 text-sm sm:order-none sm:w-auto">
-            {NAV_LINKS.map(({ href, label }) => (
-              <Link key={href} href={href} className="text-muted-foreground hover:text-foreground">
-                {label}
-              </Link>
-            ))}
+          <nav
+            aria-label="Main"
+            className="order-last flex basis-full gap-5 border-t sm:order-none sm:flex-1 sm:basis-auto sm:border-t-0"
+          >
+            <Suspense fallback={<MainNavLinks links={NAV_LINKS} />}>
+              <MainNavActive links={NAV_LINKS} />
+            </Suspense>
           </nav>
           <Suspense fallback={null}>
             <UserMenu />
           </Suspense>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pt-6 pb-12 sm:pt-10">{children}</main>
       <Suspense fallback={null}>
         <DetectTimeZoneIfUnset />
       </Suspense>
