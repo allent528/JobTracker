@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getStats } from "@/lib/application-queries";
 import { formatDate } from "@/lib/dates";
-import { RESPONSE_RATE_FROM, STATUS_META } from "@/lib/status";
+import { RESPONSE_RATE_CLOSED_RESPONSES, RESPONSE_RATE_FROM, STATUS_META } from "@/lib/status";
 import {
   formatDays,
   INCLUDE_ARCHIVED_PARAM,
@@ -122,6 +122,9 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
 function ResponseRateTile({ rate }: { rate: ResponseRate }) {
   const reachedLabel = STATUS_META[RESPONSE_RATE_FROM.reached].label;
   const respondedLabel = STATUS_META[RESPONSE_RATE_FROM.responded].label;
+  const closedLabels = new Intl.ListFormat("en", { type: "disjunction" }).format(
+    RESPONSE_RATE_CLOSED_RESPONSES.map((status) => STATUS_META[status].label),
+  );
   if (rate.percent === null) {
     return <p className="text-sm text-muted-foreground">No applications have reached {reachedLabel} yet.</p>;
   }
@@ -129,7 +132,8 @@ function ResponseRateTile({ rate }: { rate: ResponseRate }) {
     <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
       <p className="text-figure tabular-nums">{rate.percent}%</p>
       <p className="max-w-prose text-sm text-muted-foreground">
-        {rate.responded} of {rate.reached} applications that reached {reachedLabel} got to {respondedLabel} or later.
+        {rate.responded} of {rate.reached} applications that reached {reachedLabel} got to {respondedLabel} or
+        later, or to {closedLabels}.
       </p>
     </div>
   );

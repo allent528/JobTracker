@@ -8,6 +8,7 @@ import { type Client, localSuperuserQuery, newClient, recreateUser, rowOrThrow, 
 const OWNER = "rls-stats-a@example.com";
 const OTHER = "rls-stats-b@example.com";
 const REENTRY = "rls-stats-c@example.com";
+const CLOSED = "rls-stats-d@example.com";
 const TODAY = "2026-11-17"; // a Tuesday; its week starts 2026-11-16
 const DENIED = "42501";
 const INVALID_PARAMETER = "22023";
@@ -15,6 +16,7 @@ const INVALID_PARAMETER = "22023";
 let owner: Client;
 let other: Client;
 let reentry: Client;
+let closed: Client;
 
 /** Pins the application's newest status event to 2026-01-01 plus `day` days. */
 function backdateNewestEvent(applicationId: string, day: number) {
@@ -46,8 +48,8 @@ async function seed(
 }
 
 beforeAll(async () => {
-  for (const email of [OWNER, OTHER, REENTRY]) await recreateUser(email);
-  [owner, other, reentry] = await Promise.all([OWNER, OTHER, REENTRY].map(signedInClient));
+  for (const email of [OWNER, OTHER, REENTRY, CLOSED]) await recreateUser(email);
+  [owner, other, reentry, closed] = await Promise.all([OWNER, OTHER, REENTRY, CLOSED].map(signedInClient));
 
   await seed(owner, { company: "Acme Corp", date_applied: "2026-11-16" }, [
     { status: "saved", day: 0 },
@@ -134,6 +136,27 @@ describe("stats functions (F9)", () => {
     expect(duration("applied")).toEqual({ status: "applied", stays: 2, averageDays: 2.5 });
     expect(duration("screening")).toEqual({ status: "screening", stays: 2, averageDays: 1 });
     expect(stats.responseRate).toEqual({ reached: 1, responded: 1, percent: 100 });
+  });
+
+  it("count a rejection after Applied as a response, but not withdrawn, ghosted or a rejection before Applied", async () => {
+    await seed(closed, { company: "Acme Corp" }, [
+      { status: "applied", day: 0 },
+      { status: "rejected", day: 3 },
+    ]);
+    await seed(closed, { company: "Globex" }, [
+      { status: "applied", day: 0 },
+      { status: "withdrawn", day: 3 },
+    ]);
+    await seed(closed, { company: "Initech" }, [
+      { status: "applied", day: 0 },
+      { status: "ghosted", day: 3 },
+    ]);
+    await seed(closed, { company: "Umbrella" }, [
+      { status: "saved", day: 0 },
+      { status: "rejected", day: 3 },
+    ]);
+    const stats = await selectStats(closed, { today: TODAY, includeArchived: false });
+    expect(stats.responseRate).toEqual({ reached: 3, responded: 1, percent: 33 });
   });
 
   it("never count another user's applications", async () => {
