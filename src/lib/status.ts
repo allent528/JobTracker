@@ -44,18 +44,21 @@ export function forwardPathFrom(status: Status): readonly Status[] {
 }
 
 /**
- * F9 response rate: applications that ever reached `responded` or later out of those that ever
- * reached `reached` or later, along the forward path. A closed status (rejected, withdrawn, ghosted)
- * isn't on the path, so it counts only through the stages reached before it.
+ * F9 response rate: of the applications that ever reached `reached` or later on the forward path,
+ * the share that ever reached `responded` or later, or one of `RESPONSE_RATE_CLOSED_RESPONSES`.
+ * Other closed statuses (withdrawn, ghosted) count only through the stages reached before them.
  */
 export const RESPONSE_RATE_FROM = { reached: "applied", responded: "screening" } as const satisfies Record<
   string,
   Status
 >;
 
+/** Closed statuses that count as a response: a rejection is a reply from the employer. */
+export const RESPONSE_RATE_CLOSED_RESPONSES = ["rejected"] as const satisfies readonly Status[];
+
 export const RESPONSE_RATE_STATUSES = {
   reached: forwardPathFrom(RESPONSE_RATE_FROM.reached),
-  responded: forwardPathFrom(RESPONSE_RATE_FROM.responded),
+  responded: [...forwardPathFrom(RESPONSE_RATE_FROM.responded), ...RESPONSE_RATE_CLOSED_RESPONSES],
 } as const;
 
 export function isStatus(value: string): value is Status {

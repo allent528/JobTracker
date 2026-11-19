@@ -3,8 +3,8 @@ import type { Page, Route } from "@playwright/test";
 import { UNREACHABLE_ERROR } from "../../src/lib/action-result";
 import { APPLICATION_NOT_FOUND } from "../../src/lib/applications";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_META } from "../../src/lib/status";
-import { expect, test } from "./support/fixtures";
-import { adminClient, findUserByEmail, seedApplications, TEST_USERS } from "./support/local-env";
+import { collectConsoleErrors, expect, expectHydrated, test } from "./support/fixtures";
+import { adminClient, findUserByEmail, seedApplications } from "./support/local-env";
 
 function dayFromTodayUtc(offset: number): string {
   const date = new Date();
@@ -39,9 +39,10 @@ function boardOverflow(page: Page): Promise<number> {
   });
 }
 
-test("table view sorts, filters and searches", async ({ page, signInAs }) => {
-  await signInAs(TEST_USERS.pipelineTable);
-  await seedApplications(TEST_USERS.pipelineTable, [
+test("table view sorts, filters and searches", async ({ page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.pipelineTable);
+  await seedApplications(users.pipelineTable, [
     { company: "Acme Corp", role_title: "Software Engineer", status: "applied", work_mode: "remote", date_applied: "2026-10-01", updated_at: "2026-11-03T10:00:00Z" },
     { company: "Globex", role_title: "Data Analyst", status: "screening", work_mode: "onsite", date_applied: "2026-09-15", updated_at: "2026-11-05T10:00:00Z" },
     { company: "Initech", role_title: "Product Manager", status: "rejected", work_mode: "hybrid", date_applied: "2026-10-20", updated_at: "2026-11-01T10:00:00Z" },
@@ -94,14 +95,17 @@ test("table view sorts, filters and searches", async ({ page, signInAs }) => {
   await search.fill("no such company");
   await expect(table).toContainText("No applications match these filters.");
   await expect(page.getByRole("status").filter({ hasText: "applications" })).toHaveText("0 applications");
+  expect(consoleErrors()).toEqual([]);
 });
 
 test("board shows active columns in automatic order and moves a card from its keyboard menu", async ({
   page,
   signInAs,
+  users,
 }) => {
-  await signInAs(TEST_USERS.pipelineBoard);
-  await seedApplications(TEST_USERS.pipelineBoard, [
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.pipelineBoard);
+  await seedApplications(users.pipelineBoard, [
     { company: "Plain Co", role_title: "Engineer", status: "applied", updated_at: "2026-11-10T10:00:00Z" },
     { company: "Later Co", role_title: "Engineer", status: "applied", next_follow_up_on: dayFromTodayUtc(3) },
     { company: "Overdue Co", role_title: "Engineer", status: "applied", next_follow_up_on: dayFromTodayUtc(-1) },
@@ -110,6 +114,7 @@ test("board shows active columns in automatic order and moves a card from its ke
     { company: "Archived Co", role_title: "Engineer", status: "saved", archived_at: "2026-11-02T10:00:00Z" },
   ]);
   await page.goto("/applications");
+  await expectHydrated(column(page, "Saved"));
 
   for (const status of ACTIVE_STATUSES) await expect(column(page, STATUS_META[status].label)).toBeVisible();
   for (const status of CLOSED_STATUSES) await expect(column(page, STATUS_META[status].label)).toHaveCount(0);
@@ -152,21 +157,34 @@ test("board shows active columns in automatic order and moves a card from its ke
   await expect(page.getByRole("heading", { level: 1, name: "Plain Co" })).toBeVisible();
   await expect(history(page)).toHaveCount(2);
   await expect(history(page).first()).toContainText("Applied → Screening");
+  expect(consoleErrors()).toEqual([]);
 });
 
-test("dragging a card to another column changes its status", async ({ page, signInAs }) => {
-  await signInAs(TEST_USERS.pipelineDrag);
-  await seedApplications(TEST_USERS.pipelineDrag, [{ company: "Drag Co", role_title: "Engineer", status: "saved" }]);
+test("dragging a card to another column changes its status", async ({ page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.pipelineDrag);
+  await seedApplications(users.pipelineDrag, [{ company: "Drag Co", role_title: "Engineer", status: "saved" }]);
   await page.goto("/applications");
+  await expectHydrated(card(page, "Saved", "Drag Co"));
 
   const source = await card(page, "Saved", "Drag Co").boundingBox();
-  const target = await column(page, "Screening").boundingBox();
-  if (!source || !target) throw new Error("Board not rendered.");
+  if (!source) throw new Error("Board not rendered.");
 
-  // Grab the card's padding (not the link or menu), then move in steps so the mouse sensor activates.
+  // Grab the card's padding (not the link or menu), then move past the mouse sensor's 8px so the
+  // drag starts. Measure the target only then: the layout can still move until the drag begins.
   await page.mouse.move(source.x + source.width - 8, source.y + 8);
   await page.mouse.down();
+  await page.mouse.move(source.x + source.width - 8, source.y + 24, { steps: 4 });
+  await expect(page.getByRole("status").filter({ hasText: "Drag Co" })).toHaveText(
+    /^(Picked up Drag Co|Drag Co is over Saved)\.$/,
+  );
+  const target = await column(page, "Screening").boundingBox();
+  if (!target) throw new Error("Board not rendered.");
   await page.mouse.move(target.x + target.width / 2, target.y + 80, { steps: 15 });
+  // The board works out the column under the pointer after the move event, so a release straight
+  // after the last move can still drop on the column before it (Firefox, WebKit). Release once the
+  // board announces the target.
+  await expect(page.getByRole("status").filter({ hasText: "Drag Co is" })).toHaveText("Drag Co is over Screening.");
   await page.mouse.up();
 
   await expect(card(page, "Screening", "Drag Co")).toBeVisible();
@@ -177,6 +195,7 @@ test("dragging a card to another column changes its status", async ({ page, sign
   await expect(card(page, "Screening", "Drag Co")).toBeVisible();
   await card(page, "Screening", "Drag Co").getByRole("link").click();
   await expect(history(page).first()).toContainText("Saved → Screening");
+  expect(consoleErrors()).toEqual([]);
 });
 
 async function moveWithMenu(page: Page, company: string, status: string) {
@@ -187,16 +206,18 @@ async function moveWithMenu(page: Page, company: string, status: string) {
 const isServerAction = (route: Route) =>
   route.request().method() === "POST" && route.request().headers()["next-action"] !== undefined;
 
-test("a move shows at once and rolls back when it fails or can't reach the server", async ({ page, signInAs }) => {
-  await signInAs(TEST_USERS.pipelineRollback);
-  await seedApplications(TEST_USERS.pipelineRollback, [
+test("a move shows at once and rolls back when it fails or can't reach the server", async ({ page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.pipelineRollback);
+  await seedApplications(users.pipelineRollback, [
     { company: "Gone Co", role_title: "Engineer", status: "saved" },
     { company: "Offline Co", role_title: "Engineer", status: "saved" },
   ]);
   await page.goto("/applications");
   await expect(card(page, "Saved", "Gone Co")).toBeVisible();
+  await expectHydrated(card(page, "Saved", "Gone Co"));
 
-  const user = await findUserByEmail(TEST_USERS.pipelineRollback);
+  const user = await findUserByEmail(users.pipelineRollback);
   if (!user) throw new Error("Rollback test user is missing.");
   const { error } = await adminClient().from("applications").delete().eq("user_id", user.id).eq("company", "Gone Co");
   if (error) throw error;
@@ -216,6 +237,7 @@ test("a move shows at once and rolls back when it fails or can't reach the serve
   await expect(page.getByText(APPLICATION_NOT_FOUND)).toBeVisible();
   await expect(card(page, "Saved", "Gone Co")).toBeVisible();
   await expect(card(page, "Offer", "Gone Co")).toHaveCount(0);
+  expect(consoleErrors()).toEqual([]); // before the aborted request below, which the browser logs
 
   await page.unrouteAll({ behavior: "wait" });
   await page.route("**/applications*", (route) => (isServerAction(route) ? route.abort() : route.continue()));
@@ -229,9 +251,10 @@ test("a move shows at once and rolls back when it fails or can't reach the serve
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("board and table fit without horizontal page scroll", async ({ page, signInAs }) => {
-    await signInAs(TEST_USERS.pipelinePhone);
-    await seedApplications(TEST_USERS.pipelinePhone, [
+  test("board and table fit without horizontal page scroll", async ({ page, signInAs, users }) => {
+    const consoleErrors = collectConsoleErrors(page);
+    await signInAs(users.pipelinePhone);
+    await seedApplications(users.pipelinePhone, [
       { company: "Acme Corp", role_title: "Senior Software Engineer, Platform Infrastructure", status: "interviewing", next_follow_up_on: dayFromTodayUtc(-2) },
       { company: "Globex", role_title: "Data Analyst", status: "saved", date_applied: "2026-10-01" },
     ]);
@@ -244,5 +267,6 @@ test.describe("at phone width", () => {
     await page.getByRole("link", { name: "Table" }).click();
     await expect(page.getByRole("table", { name: "Applications" }).getByRole("link", { name: "Acme Corp" })).toBeVisible();
     await expectNoHorizontalScroll(page);
+    expect(consoleErrors()).toEqual([]);
   });
 });

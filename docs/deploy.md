@@ -14,7 +14,7 @@ Nothing in this file has been run yet. Tick the boxes as you go.
 | --- | --- | --- | --- |
 | 1 | Merge the deploy-prep PR; check the project isn't paused | Owner | A1 |
 | 2 | Reset the database password | Owner | A2 |
-| 3 | Auth settings: sign-ups off, OTP, email template, rate limits, SMTP | Owner | A3 |
+| 3 | Auth settings: sign-ups off, OTP, email template, Gmail SMTP, rate limits | Owner | A3 |
 | 4 | Check the Data API exposes only `public` | Owner | A4 |
 | 5 | `supabase login` | Owner | B1 |
 | 6 | Link the CLI to prod | Claude (approval) | B2 |
@@ -62,11 +62,34 @@ Do these before the first sign-in. Write down any value you change (old and new)
      <p>The link and code expire in 15 minutes. If you didn't ask to sign in, ignore this email.</p>
      ```
    - **Verify:** the template preview shows the link and a code placeholder. The link must start with `{{ .SiteURL }}/auth/confirm`, not `{{ .ConfirmationURL }}` (that one skips the app's `/auth/confirm` route).
-4. [ ] **Rate limits.** Authentication → Rate Limits. The defaults are fine for one user; check they're not 0. With the built-in email sender the email limit is fixed and very low (about 2 emails an hour for the whole project), so don't request codes in a loop during the smoke test.
-   - **Verify:** you read the page; nothing is set to 0.
-5. [ ] **Email sender (decision).** The built-in sender is for testing: it's rate-limited and only delivers to addresses that are members of your Supabase organization. If your sign-in email is the address you use for Supabase, it works. If not, or if you want reliable delivery, set up custom SMTP (Authentication → Emails → SMTP Settings) with a transactional email provider. Your call; not needed to launch if your address is a team member.
-   - **Verify:** in part C the sign-in email arrives within a minute.
+4. [ ] **Custom SMTP (owner decision 2026-11-18: "yes if free").** The built-in sender is for testing only: about 2 emails an hour for the whole project, and only to members of your Supabase organization. Use Gmail's SMTP server with a Google App Password, which is free. Details in A3a below.
+   - **Verify:** Authentication → Emails → SMTP Settings shows custom SMTP on, with host `smtp.gmail.com`.
+5. [ ] **Rate limits (after SMTP).** Authentication → Rate Limits. Once custom SMTP is on, the email limit can be changed: set **Rate limit for sending emails** to **30 per hour** (enough for one person who mistypes a code a few times, and a runaway loop is capped at 30 an hour). Leave the other limits at their defaults, and check none is 0. Keep the per-user minimum interval between emails at 60 seconds.
+   - **Verify:** reload; the email limit shows 30 and nothing is 0.
 6. Leave everything else (other providers, MFA, anonymous sign-ins) off.
+
+### A3a. Gmail SMTP with an App Password (free)
+You need 2-Step Verification on the Google account; App Passwords don't exist without it.
+
+1. [ ] **Turn on 2-Step Verification** if it isn't: Google Account → Security → 2-Step Verification.
+2. [ ] **Create an App Password:** Google Account → Security → 2-Step Verification → **App passwords** (or search "App passwords" in the account settings). Name it "JobTracker Supabase". Google shows a 16-character password once.
+   - Type or paste it **only** into the Supabase dashboard field in step 3. Never into chat with Claude, a file in the repo, a commit, or a note app synced in plain text. If it leaks, revoke it on the same page and make a new one.
+3. [ ] **Supabase:** Authentication → Emails → **SMTP Settings** → enable custom SMTP:
+   | Field | Value |
+   | --- | --- |
+   | Sender email | your Gmail address (Gmail rewrites any other From address) |
+   | Sender name | `JobTracker` |
+   | Host | `smtp.gmail.com` |
+   | Port | `465` (SSL), or `587` (STARTTLS) if 465 fails |
+   | Username | your Gmail address |
+   | Password | the App Password from step 2 |
+   | Minimum interval between emails | 60 seconds (the default) |
+   Save.
+4. [ ] Then set the email rate limit (A3.5).
+
+**Limits** (check Google's current limits): a personal Gmail account can send roughly 500 emails a day, and Google may pause sending for a day if it sees unusual volume. JobTracker sends one email per sign-in request, so one user stays far below that. If the first email lands in spam, mark it "Not spam". Changing the Google password revokes App Passwords: make a new one and update the Supabase field.
+
+**Alternative:** a free [Resend](https://resend.com) account (3,000 emails a month, 100 a day at the time of writing; check Resend's current limits). It needs a domain you control, with the DNS records Resend gives you, and is the better choice once you own a domain. Supabase's SMTP settings then use Resend's host, port and an API key as the password, entered only in the dashboard as above.
 
 Don't run `npx supabase config push`: it would copy the local settings (`site_url` = localhost, rate limit 100) to prod. The dashboard is the source of truth for prod auth settings.
 
@@ -123,6 +146,8 @@ $env:SUPABASE_DB_PASSWORD = [Net.NetworkCredential]::new('', (Read-Host -AsSecur
 The typed password isn't shown or saved in history. Claude never prints the environment (no `env`, `set` or `echo` of it). After B6, clear it: `Remove-Item Env:SUPABASE_DB_PASSWORD` (or close that window).
 
 Or run those commands yourself in your own terminal and paste the output (it contains no secrets).
+
+<a id="supabase-mcp"></a>**Owner decision 2026-11-18: read-only MCP.** `read_only=true` (in `.mcp.json`) runs the MCP's queries as a read-only Postgres user and disables its write tools; migrations go through the CLI with per-step approval (below). Its features are trimmed to `docs`, `database`, `debugging` and `development`. Read-only still allows `SELECT` on prod rows, so Claude queries prod only for this runbook's read-only checks, never to browse data. It takes effect after restarting Claude Code (or `/mcp`).
 
 ### B1. Log in (owner)
 - [ ] **Owner runs** in their own terminal: `npx supabase login` (opens the browser; approve).
@@ -219,12 +244,12 @@ After part B, Claude records the results (advisor findings, ACLs, drift) in `doc
 
 ## C. Smoke test (owner, phone and desktop)
 
-Use the real production URL. Use obviously fake test data ("Smoke Test Co", "Test Contact"), and delete it at the end. Don't request more sign-in emails than needed (rate limit, A3.4).
+Use the real production URL. Use obviously fake test data ("Smoke Test Co", "Test Contact"), and delete it at the end. Don't request more sign-in emails than needed (rate limit, A3.5).
 
 **Desktop (a current Chrome, Edge or Firefox)** and **phone (Safari on iPhone or Chrome on Android)**; each check says where.
 
 1. [ ] **Signed-out redirect** (phone): open `<prod-url>/applications`. **Expect:** the sign-in page.
-2. [ ] **Sign in with the code** (phone): enter your email → the email arrives (subject "Your JobTracker sign-in link and code") → enter the 6-digit code. **Expect:** the Reminders page, with "Today is <date> in <your zone>" showing your zone (detected on first sign-in).
+2. [ ] **Sign in with the code** (phone): enter your email → the email arrives within a minute through Gmail SMTP (from "JobTracker" at your Gmail address, subject "Your JobTracker sign-in link and code") → enter the 6-digit code. **Expect:** the Reminders page, with "Today is <date> in <your zone>" showing your zone (detected on first sign-in).
 3. [ ] **Unknown email** (phone, optional; costs one email): sign out, enter an address that has no account. **Expect:** the same "If <email> has an account, we sent it…" answer, no email, and no new user under Supabase → Authentication → Users (sign-ups off).
 4. [ ] **Sign in with the link** (desktop): request a sign-in, open the email, click **Sign in**. **Expect:** the link starts with `<prod-url>/auth/confirm` (not localhost), and you land on Reminders signed in. Click the same link again: **Expect:** back on sign-in with "That sign-in link is invalid or has expired.".
 5. [ ] **Create** (desktop): Applications → New application, "Smoke Test Co" / "Test Role", no date applied → Save. **Expect:** the detail page, status Saved.

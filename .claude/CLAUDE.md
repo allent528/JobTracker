@@ -34,7 +34,7 @@ Run from the repo root.
 - Lint: `npm run lint`
 - Build: `npm run build` (CI runs it with placeholder env)
 - Unit tests: `npm test` → `vitest run`
-- E2E: `npm run test:e2e` → `playwright test`
+- E2E: `npm run test:e2e` → `playwright test` (Chromium, Firefox and WebKit; builds and starts a production server; set `E2E_REUSE_SERVER=1` to reuse one already on port 3000). Quick run: `npx playwright test --project=chromium`. First time: `npx playwright install chromium firefox webkit`.
 - RLS checks: `npm run test:rls` → `vitest run --config vitest.rls.config.mts` (local stack only; not in CI)
 - DB advisors (local): `npx supabase db advisors --type all --level info` and `npx supabase db lint --schema public,private`
 - Local Supabase: `npx supabase start` / `npx supabase stop` (needs Docker Desktop running); `npx supabase db reset` reapplies all migrations + seed locally

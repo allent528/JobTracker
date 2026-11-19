@@ -67,6 +67,6 @@ describe("forwardPathFrom", () => {
   it("builds the response rate sets from RESPONSE_RATE_FROM", () => {
     expect(RESPONSE_RATE_FROM).toEqual({ reached: "applied", responded: "screening" });
     expect(RESPONSE_RATE_STATUSES.reached).toEqual(["applied", "screening", "interviewing", "offer", "accepted"]);
-    expect(RESPONSE_RATE_STATUSES.responded).toEqual(["screening", "interviewing", "offer", "accepted"]);
+    expect(RESPONSE_RATE_STATUSES.responded).toEqual(["screening", "interviewing", "offer", "accepted", "rejected"]);
   });
 });

@@ -2,17 +2,8 @@ import type { Page } from "@playwright/test";
 
 import { addDays, dateInTimeZone } from "../../src/lib/dates";
 import { localSuperuserQuery } from "../rls/support";
-import { expect, test } from "./support/fixtures";
-import { adminClient, seedApplications, TEST_USERS } from "./support/local-env";
-
-function collectConsoleErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
-  return errors;
-}
+import { collectConsoleErrors, expect, test } from "./support/fixtures";
+import { adminClient, seedApplications } from "./support/local-env";
 
 async function expectNoHorizontalScroll(page: Page) {
   const overflow = await page.evaluate(
@@ -65,9 +56,9 @@ async function seedStats(email: string) {
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("shows the counts, weekly numbers, response rate and stage averages", async ({ page, signInAs }) => {
+  test("shows the counts, weekly numbers, response rate and stage averages", async ({ page, signInAs, users }) => {
     const consoleErrors = collectConsoleErrors(page);
-    const email = TEST_USERS.stats;
+    const email = users.stats;
     await signInAs(email);
     await seedStats(email);
 
@@ -84,8 +75,10 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Total 3" })).toBeVisible();
 
     const response = section(page, "Response rate");
-    await expect(response.getByText("50%")).toBeVisible();
-    await expect(response).toContainText("1 of 2 applications that reached Applied got to Screening or later.");
+    await expect(response.getByText("100%")).toBeVisible();
+    await expect(response).toContainText(
+      "2 of 2 applications that reached Applied heard back: they reached Screening or later, or were rejected.",
+    );
 
     const weekly = section(page, /^Applications per week/);
     await expect(weekly).toContainText("2 applications in the last 12 weeks.");
@@ -106,7 +99,7 @@ test.describe("at phone width", () => {
     await expect(page).toHaveURL("/stats?archived=1");
     await expect(byStatus.getByRole("row", { name: "Total 4" })).toBeVisible();
     await expect(byStatus.getByRole("row", { name: "Applied 1" })).toBeVisible();
-    await expect(response.getByText("33%")).toBeVisible();
+    await expect(response.getByText("67%")).toBeVisible();
     await expect(weekly).toContainText("3 applications in the last 12 weeks.");
 
     await page.reload();
@@ -117,20 +110,20 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Total 3" })).toBeVisible();
 
     await expectNoHorizontalScroll(page);
-    expect(consoleErrors).toEqual([]);
+    expect(consoleErrors()).toEqual([]);
   });
 });
 
-test("another user sees an empty dashboard, not the owner's stats", async ({ browser, page, signInAs }) => {
-  await signInAs(TEST_USERS.statsIsolationOwner);
-  await seedStats(TEST_USERS.statsIsolationOwner);
+test("another user sees an empty dashboard, not the owner's stats", async ({ browser, page, signInAs, users }) => {
+  await signInAs(users.statsIsolationOwner);
+  await seedStats(users.statsIsolationOwner);
   await page.goto("/stats");
   await expect(section(page, "Applications by status").getByRole("row", { name: "Total 3" })).toBeVisible();
 
   const context = await browser.newContext();
   const otherPage = await context.newPage();
   const consoleErrors = collectConsoleErrors(otherPage);
-  await signInAs(TEST_USERS.statsIsolationOther, otherPage);
+  await signInAs(users.statsIsolationOther, otherPage);
   for (const path of ["/stats", "/stats?archived=1"]) {
     await otherPage.goto(path);
     // Streaming can briefly leave a hidden copy of the content in the DOM.
@@ -141,6 +134,6 @@ test("another user sees an empty dashboard, not the owner's stats", async ({ bro
       await expect(section(otherPage, name)).toHaveCount(0);
     }
   }
-  expect(consoleErrors).toEqual([]);
+  expect(consoleErrors()).toEqual([]);
   await context.close();
 });

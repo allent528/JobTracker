@@ -430,19 +430,19 @@
 4. Read-only prod checks: advisors, lint, RLS/grant/`proacl` queries, type drift.
 **Owner to-dos (dashboards; see docs/deploy.md part A)**
 - Merge this PR; restore the project if paused; reset the DB password.
-- Auth: sign-ups off; OTP length 6 and expiry 900 s; Magic Link template (subject + body in deploy.md A3); check rate limits; decide on custom SMTP (the built-in sender only delivers to Supabase org members and about 2 emails an hour).
+- Auth: sign-ups off; OTP length 6 and expiry 900 s; Magic Link template (subject + body in deploy.md A3); Gmail SMTP with an App Password (A3a, decided 2026-11-18); then the email rate limit to 30 an hour.
 - Data API exposes only `public` and `graphql_public`.
 - After the push: add your user, auto-confirmed.
 - Vercel: import, env vars (Production only), deploy, production branch `main`, previews off, analytics off; optionally match the function region to Supabase's.
 - Site URL = the prod URL; redirect URLs `<prod-url>/**`; no localhost entries.
 - Run the smoke test (deploy.md part C).
-**Open owner decisions**
-- Follow-ups on applications in a closed status still show on the home page (step 7 default). Keep or hide?
-- Stats: Applied → Rejected counts as reached but not responded (step 8 default, the PRD read literally). Should a rejection count as a response?
-- Dark mode: works since the design pass (PR #9) and follows the OS setting. Still open: add an in-app toggle, or keep it OS-only?
-- Custom SMTP now or later.
-- Read-only Supabase MCP (`.mcp.json` still has write features pointing at prod), open since step 1.
-- Before launch per the step 1 decision: add Firefox/WebKit to Playwright, or launch on Chromium-only e2e?
+**Open owner decisions** (all but the keep-alive decided on 2026-11-18; see the "Owner decisions" entry)
+- ~~Closed-status follow-ups on the home page~~: keep.
+- ~~Does a rejection count as a response~~: yes.
+- ~~Dark mode toggle~~: no, follow the OS.
+- ~~Custom SMTP~~: yes, Gmail SMTP (free).
+- ~~Read-only Supabase MCP~~: yes.
+- ~~Firefox/WebKit in Playwright~~: yes, added.
 - Keep-alive for the paused-project issue (use weekly, upgrade, or a scheduled ping), default: none.
 **Follow-ups (unchanged, not blocking launch)**
 - Reject Intl-unsupported time-zone names (such as `Factory`) in the database in the next migration; the app already falls back to UTC.
@@ -484,3 +484,21 @@
 - Shared `PanelSection`, `Empty` and `ADD_FORM_PANEL`. Contact and interview forms have no chrome of their own. The application form's footer is a sibling with its own padding. The nav takes its link height from the link class, and its width no longer depends on the header's padding. A `.table-panel` rule replaces four arbitrary selectors.
 - Tokens: the default transition reads `--duration-quick` and `--ease-smooth-out`. Unused motion tokens, `--chart-1/3/4/5` and `--sidebar-*` are deleted, and `shadow-sm` is flat (the Board/Table segment no longer has a shadow). The wordmark is `text-base`, chart bars share `MARK_RADIUS`, and narration comments are trimmed. `globals.css` is regrouped (focus, badge, table, dialogs, menus, toasts, one reduced-motion block). DESIGN.md is brought in line with the code.
 - Gates on the final code, run one after another: typecheck, lint, `npm test` (192), the CI build and `npm run test:rls` (43/43) pass. `npm run test:e2e`: two runs on the final code failed, the first with 3 failures and the second with 1. Every failure was a timeout in a long phone-width test or in the sign-in fixture's time-zone wait, and those runs were slower (50s against 38s). The next four full runs passed 20/20: two normal runs, one right after a fresh build and one with a single worker. The failing applications test also passed 3 serial repeats on its own (7 to 11s each against its 30s limit). Not reproduced; logged as a load flake. Screenshots were recaptured on the final code.
+
+## 2026-11-18: Owner decisions applied (branch `chore/owner-decisions`, PR #11)
+**Status:** Done, pending owner review. No migration. Nothing touched prod (no link, `--remote`, push, MCP or Vercel command). PR #11 has the full change list and gate numbers.
+**Decisions (owner, 2026-11-18)**
+1. A rejection counts as a response. Of the applications that reached Applied or later, "responded" means reached Screening or later, or went to Rejected. Withdrawn and Ghosted don't count, and an application that went from Saved straight to Rejected isn't counted. This is `RESPONSE_RATE_CLOSED_RESPONSES` in `status.ts`; the SQL function already takes the lists. Known edge: the function checks each list without order, so an application rejected first and moved to Applied later would also count as responded. Rare; left as is.
+2. Follow-ups on closed applications stay on the home page ("yes, but very rare"). No change.
+3. Dark mode follows the OS, no toggle. No change.
+4. The detail page's status select is labelled "New status", under the "Status" heading.
+5. Custom SMTP "yes if free": Gmail SMTP with an App Password, then the email rate limit at 30 an hour (deploy.md A3a and A3.5). The owner does these in the dashboard and re-tests sign-in in the smoke test.
+6. Read-only Supabase MCP, with features trimmed to `docs`, `database`, `debugging` and `development`. Reasoning in [deploy.md part B](deploy.md#supabase-mcp). Read-only still allows `SELECT` on prod rows, so Claude queries prod only for the deploy's read-only checks. **The owner must restart Claude Code (or `/mcp`) for it to apply.**
+7. Firefox and WebKit join Chromium in Playwright, each project with its own test users (the `users` fixture). E2E runs against a fresh production build; `E2E_REUSE_SERVER=1` reuses a running server. CI still runs no e2e.
+**Cross-browser bug fixed in the app:** Firefox fetched the font twice (a `Link` preload header and a `<link>` tag) and warned; `preload: false` in `layout.tsx`. The rest was test timing or engine noise (learnings.md, 2026-11-18): fills during hydration, cancelled-fetch errors when a test leaves a page, and dnd-kit's lag after the last move.
+**Review fixes (code-quality review of PR #11):** the `users` fixture replaces the `TEST_USERS` getters; global setup lists users once; the server is reused only with `E2E_REUSE_SERVER`; failed tests keep traces; the 60s timeout applies to Firefox and WebKit only; the applications and pipeline specs check the console too, which needed the collector to drop errors from cut-off fetches; the stats copy reads "…heard back: they reached Screening or later, or were rejected."; the `.mcp.json` features are trimmed; comments and docs are tightened.
+**Checks after the review fixes** (run one after another, nothing else on the stack): typecheck, lint, `npm test` (192), the CI-env build and `npm run test:rls` (44/44) pass. `npm run test:e2e`: the first two runs, before the collector change, failed on console noise only (59/60 with 1 WebKit failure, then 55/60 with 1 Firefox and 4 WebKit failures). The two runs after it were each 60/60 (chromium 20, firefox 20, webkit 20).
+**Files:** `src/lib/status{,.test}.ts`, `src/app/(app)/stats/page.tsx`, `src/app/(app)/applications/[id]/application-controls.tsx`, `src/app/layout.tsx`, `playwright.config.ts`, `tests/e2e/**`, `tests/rls/stats-query.test.ts`, `.mcp.json`, `docs/{deploy,progress,learnings}.md`, `docs/prd/PRD.md`, `.claude/CLAUDE.md`, `.claude/rules/{testing,ui}.md`
+**Backlog**
+- A controlled field typed into before hydration finishes can be wiped on a slow device (React resets it at the commit). It's a UX gap; not changed.
+- Keep-alive for the paused-project issue (default: none).

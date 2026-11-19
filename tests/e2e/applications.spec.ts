@@ -1,8 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { formatDate } from "../../src/lib/dates";
-import { expect, test } from "./support/fixtures";
-import { TEST_USERS } from "./support/local-env";
+import { collectConsoleErrors, expect, expectHydrated, test } from "./support/fixtures";
 
 // The e2e users have no profiles.time_zone, so "today" is today in UTC (FALLBACK_TIME_ZONE).
 const todayIsoUtc = () => new Date().toISOString().slice(0, 10);
@@ -13,7 +12,7 @@ function field(page: Page, label: string) {
 }
 
 function statusSelect(page: Page) {
-  return page.getByRole("combobox", { name: "Status", exact: true });
+  return page.getByRole("combobox", { name: "New status", exact: true });
 }
 
 function detail(page: Page, label: string) {
@@ -34,8 +33,9 @@ async function expectNoHorizontalScroll(page: Page) {
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("create, edit, change status, archive and delete an application", async ({ page, signInAs }) => {
-    await signInAs(TEST_USERS.applications);
+  test("create, edit, change status, archive and delete an application", async ({ page, signInAs, users }) => {
+    const consoleErrors = collectConsoleErrors(page);
+    await signInAs(users.applications);
     await page.goto("/applications");
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     await expect(page.getByText("No applications yet.")).toBeVisible();
@@ -130,14 +130,17 @@ test.describe("at phone width", () => {
     await dialog.getByRole("button", { name: "Delete application" }).click();
     await expect(page).toHaveURL("/applications");
     await expect(page.getByText("No applications yet.")).toBeVisible();
+    expect(consoleErrors()).toEqual([]); // before the 404 below, which the browser logs as a failed load
     await page.goto(detailUrl);
     await expect(page.getByText("This page could not be found.")).toBeVisible();
   });
 });
 
-test("a new application with a date applied starts in Applied", async ({ page, signInAs }) => {
-  await signInAs(TEST_USERS.appliedOnCreate);
+test("a new application with a date applied starts in Applied", async ({ page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.appliedOnCreate);
   await page.goto("/applications/new");
+  await expectHydrated(field(page, "Company"));
   await field(page, "Company").fill("Globex Inc");
   await field(page, "Role title").fill("Data Analyst");
   await field(page, "Date applied").fill("2026-11-02");
@@ -153,11 +156,14 @@ test("a new application with a date applied starts in Applied", async ({ page, s
   await page.getByRole("link", { name: "New application" }).click();
   await expect(field(page, "Company")).toHaveValue("");
   await expect(field(page, "Date applied")).toHaveValue("");
+  expect(consoleErrors()).toEqual([]);
 });
 
-test("another user can't open someone else's application", async ({ browser, page, signInAs }) => {
-  await signInAs(TEST_USERS.isolationOwner);
+test("another user can't open someone else's application", async ({ browser, page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.isolationOwner);
   await page.goto("/applications/new");
+  await expectHydrated(field(page, "Company"));
   await field(page, "Company").fill("Initech");
   await field(page, "Role title").fill("Platform Engineer");
   await field(page, "Follow-up note").fill("Owner-only note");
@@ -168,7 +174,7 @@ test("another user can't open someone else's application", async ({ browser, pag
   const otherContext = await browser.newContext();
   try {
     const other = await otherContext.newPage();
-    await signInAs(TEST_USERS.isolationOther, other);
+    await signInAs(users.isolationOther, other);
     for (const path of [detailPath, `${detailPath}/edit`]) {
       await other.goto(path);
       await expect(other.getByText("This page could not be found.")).toBeVisible();
@@ -186,4 +192,5 @@ test("another user can't open someone else's application", async ({ browser, pag
   } finally {
     await otherContext.close();
   }
+  expect(consoleErrors()).toEqual([]);
 });

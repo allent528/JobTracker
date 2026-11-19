@@ -69,7 +69,7 @@ A job search means dozens of applications at different stages, each with its own
 ### F9: Stats dashboard
 - [ ] Count of applications per status (active and closed).
 - [ ] Applications per week (by date applied) for the last 12 weeks.
-- [ ] Response rate: share of applications that reached `screening` or later, out of those that reached `applied`.
+- [ ] Response rate: of the applications that reached `applied` or later, the share that reached `screening` or later or went to `rejected` (owner decision, 2026-11-18: a rejection is a response; `withdrawn` and `ghosted` aren't).
 - [ ] Average days spent in each stage, computed from `status_events`.
 - [ ] All stats exclude archived applications unless a toggle includes them.
 

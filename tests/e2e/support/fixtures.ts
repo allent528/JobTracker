@@ -1,6 +1,6 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
-import { adminClient, findUserByEmail } from "./local-env";
+import { adminClient, findUserByEmail, type TestUsers, testUsers } from "./local-env";
 
 type Fixtures = {
   /**
@@ -10,9 +10,14 @@ type Fixtures = {
    * detected again (F8).
    */
   signInAs: (email: string, target?: Page) => Promise<void>;
+  /** This project's test users, so the browsers never share a user. */
+  users: TestUsers;
 };
 
 export const test = base.extend<Fixtures>({
+  users: async ({}, provide, testInfo) => {
+    await provide(testUsers(testInfo.project.name));
+  },
   signInAs: async ({ page }, provide) => {
     await provide(async (email, target = page) => {
       const admin = adminClient();
@@ -45,3 +50,71 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
+
+/**
+ * What engines raise for a fetch or script that a page load cut off: WebKit's cancelled prefetch
+ * ("<url>?_rsc=… due to access control checks.", scheme dropped), its and Firefox's aborted
+ * fetch, and Firefox's aborted script.
+ */
+const ABORT_ERROR =
+  /^(\S+[?&]_rsc=\S+ due to access control checks\.|(TypeError: )?(Load failed|Error in input stream)|\[JavaScript Warning: "Loading failed for the <script> with source .*)$/;
+const CANCELLED_REQUEST = /^(net::ERR_ABORTED|NS_BINDING_ABORTED|Load request cancelled)$/;
+const ABORT_WINDOW_MS = 2_000;
+
+/**
+ * Collects console errors and warnings plus page errors; call the result at the end of a test and
+ * expect `[]`. It drops only `ABORT_ERROR` messages within 2s of a main-frame navigation or a
+ * cancelled request: `page.goto` and `reload` cut off Next's prefetches and refreshes, and WebKit
+ * and Firefox report that. Playwright doesn't report every cancelled request, so the
+ * navigation time counts too.
+ */
+export function collectConsoleErrors(page: Page): () => string[] {
+  const seen: { text: string; at: number }[] = [];
+  const cutoffs: number[] = [];
+  page.on("console", (message) => {
+    if (message.type() !== "error" && message.type() !== "warning") return;
+    const entry = { text: message.text(), at: Date.now() };
+    seen.push(entry);
+    // Firefox prints an Error argument as "JSHandle@object"; read the error itself.
+    const [first] = message.args();
+    if (entry.text.startsWith("JSHandle@") && first) {
+      first
+        .evaluate((value) => (value instanceof Error ? `${value.name}: ${value.message}` : String(value)))
+        .then((text) => (entry.text = text), () => {});
+    }
+  });
+  page.on("pageerror", (error) => seen.push({ text: error.message, at: Date.now() }));
+  page.on("request", (request) => {
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) cutoffs.push(Date.now());
+  });
+  page.on("requestfailed", (request) => {
+    if (CANCELLED_REQUEST.test(request.failure()?.errorText ?? "")) cutoffs.push(Date.now());
+  });
+
+  const cutOff = ({ text, at }: { text: string; at: number }) =>
+    ABORT_ERROR.test(text) && cutoffs.some((cutoff) => Math.abs(cutoff - at) <= ABORT_WINDOW_MS);
+  return () => seen.filter((entry) => !cutOff(entry)).map(({ text }) => text);
+}
+
+type Fiber = { tag: number; return: Fiber | null; stateNode: { pendingLanes?: number } | null };
+
+/**
+ * Waits until React has hydrated the element and has no render work left: a click before that is
+ * lost, and the commit resets a controlled input filled while hydration runs. Use it after a
+ * `page.goto` onto a form or the board. Pass a role or visible-filtered locator (one element).
+ * Reads React internals (fiber, root `pendingLanes`); if they change, this times out, never passes.
+ */
+export async function expectHydrated(locator: Locator) {
+  await expect
+    .poll(
+      () =>
+        locator.evaluate((element) => {
+          const key = Object.keys(element).find((name) => name.startsWith("__reactFiber$"));
+          let fiber = key ? ((element as unknown as Record<string, Fiber>)[key] ?? null) : null;
+          while (fiber && fiber.tag !== 3) fiber = fiber.return; // 3: HostRoot
+          return fiber?.stateNode?.pendingLanes === 0;
+        }),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+}
