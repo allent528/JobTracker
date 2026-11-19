@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { formatDate } from "../../src/lib/dates";
-import { expect, expectHydrated, TEST_USERS, test } from "./support/fixtures";
+import { collectConsoleErrors, expect, expectHydrated, test } from "./support/fixtures";
 
 // The e2e users have no profiles.time_zone, so "today" is today in UTC (FALLBACK_TIME_ZONE).
 const todayIsoUtc = () => new Date().toISOString().slice(0, 10);
@@ -33,8 +33,9 @@ async function expectNoHorizontalScroll(page: Page) {
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("create, edit, change status, archive and delete an application", async ({ page, signInAs }) => {
-    await signInAs(TEST_USERS.applications);
+  test("create, edit, change status, archive and delete an application", async ({ page, signInAs, users }) => {
+    const consoleErrors = collectConsoleErrors(page);
+    await signInAs(users.applications);
     await page.goto("/applications");
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     await expect(page.getByText("No applications yet.")).toBeVisible();
@@ -129,13 +130,15 @@ test.describe("at phone width", () => {
     await dialog.getByRole("button", { name: "Delete application" }).click();
     await expect(page).toHaveURL("/applications");
     await expect(page.getByText("No applications yet.")).toBeVisible();
+    expect(consoleErrors()).toEqual([]); // before the 404 below, which the browser logs as a failed load
     await page.goto(detailUrl);
     await expect(page.getByText("This page could not be found.")).toBeVisible();
   });
 });
 
-test("a new application with a date applied starts in Applied", async ({ page, signInAs }) => {
-  await signInAs(TEST_USERS.appliedOnCreate);
+test("a new application with a date applied starts in Applied", async ({ page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.appliedOnCreate);
   await page.goto("/applications/new");
   await expectHydrated(field(page, "Company"));
   await field(page, "Company").fill("Globex Inc");
@@ -153,10 +156,12 @@ test("a new application with a date applied starts in Applied", async ({ page, s
   await page.getByRole("link", { name: "New application" }).click();
   await expect(field(page, "Company")).toHaveValue("");
   await expect(field(page, "Date applied")).toHaveValue("");
+  expect(consoleErrors()).toEqual([]);
 });
 
-test("another user can't open someone else's application", async ({ browser, page, signInAs }) => {
-  await signInAs(TEST_USERS.isolationOwner);
+test("another user can't open someone else's application", async ({ browser, page, signInAs, users }) => {
+  const consoleErrors = collectConsoleErrors(page);
+  await signInAs(users.isolationOwner);
   await page.goto("/applications/new");
   await expectHydrated(field(page, "Company"));
   await field(page, "Company").fill("Initech");
@@ -169,7 +174,7 @@ test("another user can't open someone else's application", async ({ browser, pag
   const otherContext = await browser.newContext();
   try {
     const other = await otherContext.newPage();
-    await signInAs(TEST_USERS.isolationOther, other);
+    await signInAs(users.isolationOther, other);
     for (const path of [detailPath, `${detailPath}/edit`]) {
       await other.goto(path);
       await expect(other.getByText("This page could not be found.")).toBeVisible();
@@ -187,4 +192,5 @@ test("another user can't open someone else's application", async ({ browser, pag
   } finally {
     await otherContext.close();
   }
+  expect(consoleErrors()).toEqual([]);
 });

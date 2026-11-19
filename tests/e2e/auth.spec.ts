@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { OTP_LENGTH } from "../../src/lib/schemas/auth";
-import { expect, expectHydrated, noAccount, TEST_USERS, test } from "./support/fixtures";
+import { expect, expectHydrated, test } from "./support/fixtures";
 import {
   clearInbox,
   countMessages,
@@ -9,6 +9,7 @@ import {
   extractConfirmLink,
   findUserByEmail,
   latestMessage,
+  noAccountEmail,
 } from "./support/local-env";
 
 const CODE_LABEL = `${OTP_LENGTH}-digit code`;
@@ -42,8 +43,8 @@ test("signed-out visits to protected routes redirect to /login", async ({ page }
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("sign in with the emailed code, then sign out", async ({ page }) => {
-    const email = TEST_USERS.code;
+  test("sign in with the emailed code, then sign out", async ({ page, users }) => {
+    const email = users.code;
     await clearInbox(email);
 
     // Normalizes to //evil.example.com; must not become an open redirect.
@@ -74,8 +75,8 @@ test.describe("at phone width", () => {
   });
 });
 
-test("sign in with the magic link, which works only once", async ({ page }) => {
-  const email = TEST_USERS.link;
+test("sign in with the magic link, which works only once", async ({ page, users }) => {
+  const email = users.link;
   await clearInbox(email);
 
   await page.goto("/login");
@@ -99,8 +100,8 @@ test("sign in with the magic link, which works only once", async ({ page }) => {
   await expect(linkError).toHaveCount(0);
 });
 
-test("an unknown email gets the same answer, no email and no account", async ({ page }) => {
-  const nobody = noAccount();
+test("an unknown email gets the same answer, no email and no account", async ({ page }, testInfo) => {
+  const nobody = noAccountEmail(testInfo.project.name);
   await clearInbox(nobody);
 
   await page.goto("/login");

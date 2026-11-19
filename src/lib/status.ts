@@ -53,7 +53,7 @@ export const RESPONSE_RATE_FROM = { reached: "applied", responded: "screening" }
   Status
 >;
 
-/** A rejection is a reply from the employer, so it counts as a response (owner, 2026-11-18). */
+/** Closed statuses that count as a response: a rejection is a reply from the employer. */
 export const RESPONSE_RATE_CLOSED_RESPONSES = ["rejected"] as const satisfies readonly Status[];
 
 export const RESPONSE_RATE_STATUSES = {

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { collectConsoleErrors, expect, expectHydrated, TEST_USERS, test } from "./support/fixtures";
+import { collectConsoleErrors, expect, expectHydrated, test } from "./support/fixtures";
 import { adminClient, findUserByEmail } from "./support/local-env";
 
 // The e2e users have no profiles.time_zone, so interview times are read and shown in UTC.
@@ -24,7 +24,6 @@ async function expectNoHorizontalScroll(page: Page) {
   expect(overflow).toBeLessThanOrEqual(0);
 }
 
-/** Console errors and uncaught page errors, for a "console is clean" check at the end. */
 async function createApplication(email: string, status = "applied") {
   const user = await findUserByEmail(email);
   if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
@@ -47,10 +46,10 @@ async function confirmDelete(page: Page, button: string | RegExp, dialogName: st
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("notes, contacts and interviews on an application", async ({ page, signInAs }) => {
+  test("notes, contacts and interviews on an application", async ({ page, signInAs, users }) => {
     const consoleErrors = collectConsoleErrors(page);
-    await signInAs(TEST_USERS.detailSections);
-    const { applicationId } = await createApplication(TEST_USERS.detailSections);
+    await signInAs(users.detailSections);
+    const { applicationId } = await createApplication(users.detailSections);
     await page.goto(`/applications/${applicationId}`);
     await expect(page.getByRole("heading", { level: 1, name: "Acme Corp" })).toBeVisible();
     await expect(page.getByText("No notes yet.")).toBeVisible();
@@ -202,13 +201,13 @@ test.describe("at phone width", () => {
     await expect(items(page, "Interviews, in schedule order")).toHaveCount(1);
     await expect(detailValue(round, "Interviewers")).toHaveText("Pat Example");
     await expectNoHorizontalScroll(page);
-    expect(consoleErrors).toEqual([]);
+    expect(consoleErrors()).toEqual([]);
   });
 });
 
-test("another user can't see an application's notes, contacts or interviews", async ({ browser, signInAs, page }) => {
-  await signInAs(TEST_USERS.detailIsolationOwner);
-  const { userId, applicationId } = await createApplication(TEST_USERS.detailIsolationOwner);
+test("another user can't see an application's notes, contacts or interviews", async ({ browser, signInAs, page, users }) => {
+  await signInAs(users.detailIsolationOwner);
+  const { userId, applicationId } = await createApplication(users.detailIsolationOwner);
   const admin = adminClient();
   const owned = { user_id: userId, application_id: applicationId };
   const { error: noteError } = await admin.from("notes").insert({ ...owned, body: "Owner-only note" });
@@ -238,7 +237,7 @@ test("another user can't see an application's notes, contacts or interviews", as
   const otherContext = await browser.newContext();
   try {
     const other = await otherContext.newPage();
-    await signInAs(TEST_USERS.detailIsolationOther, other);
+    await signInAs(users.detailIsolationOther, other);
     await other.goto(path);
     await expect(other.getByText("This page could not be found.")).toBeVisible();
     for (const text of ["Owner-only note", "Jane Doe", "jane@example.com", "Pat Example", "Onsite"]) {

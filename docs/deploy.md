@@ -64,7 +64,7 @@ Do these before the first sign-in. Write down any value you change (old and new)
    - **Verify:** the template preview shows the link and a code placeholder. The link must start with `{{ .SiteURL }}/auth/confirm`, not `{{ .ConfirmationURL }}` (that one skips the app's `/auth/confirm` route).
 4. [ ] **Custom SMTP (owner decision 2026-11-18: "yes if free").** The built-in sender is for testing only: about 2 emails an hour for the whole project, and only to members of your Supabase organization. Use Gmail's SMTP server with a Google App Password, which is free. Details in A3a below.
    - **Verify:** Authentication → Emails → SMTP Settings shows custom SMTP on, with host `smtp.gmail.com`.
-5. [ ] **Rate limits (after SMTP).** Authentication → Rate Limits. Once custom SMTP is on, the email limit can be changed: set **Rate limit for sending emails** to **30 per hour** (enough for one person who mistypes a code a few times, low enough that a loop can't burn through Gmail's daily cap). Leave the other limits at their defaults, and check none is 0. Keep the per-user minimum interval between emails at 60 seconds.
+5. [ ] **Rate limits (after SMTP).** Authentication → Rate Limits. Once custom SMTP is on, the email limit can be changed: set **Rate limit for sending emails** to **30 per hour** (enough for one person who mistypes a code a few times, and a runaway loop is capped at 30 an hour). Leave the other limits at their defaults, and check none is 0. Keep the per-user minimum interval between emails at 60 seconds.
    - **Verify:** reload; the email limit shows 30 and nothing is 0.
 6. Leave everything else (other providers, MFA, anonymous sign-ins) off.
 
@@ -87,9 +87,9 @@ You need 2-Step Verification on the Google account; App Passwords don't exist wi
    Save.
 4. [ ] Then set the email rate limit (A3.5).
 
-**Limits.** A personal Gmail account can send roughly 500 emails a day, and Google may pause sending for a day if it sees unusual volume. JobTracker sends one email per sign-in request, so one user stays far below that. The email comes from your own address to your own address, so it shouldn't land in spam; if it does, mark it "Not spam" once. Changing the Google password revokes App Passwords: make a new one and update the Supabase field.
+**Limits** (check Google's current limits): a personal Gmail account can send roughly 500 emails a day, and Google may pause sending for a day if it sees unusual volume. JobTracker sends one email per sign-in request, so one user stays far below that. If the first email lands in spam, mark it "Not spam". Changing the Google password revokes App Passwords: make a new one and update the Supabase field.
 
-**Alternative:** a free [Resend](https://resend.com) account (3,000 emails a month, 100 a day). It needs a domain you control, with the DNS records Resend gives you, and is the better choice once you own a domain. Supabase's SMTP settings then use Resend's host, port and an API key as the password, entered only in the dashboard as above.
+**Alternative:** a free [Resend](https://resend.com) account (3,000 emails a month, 100 a day at the time of writing; check Resend's current limits). It needs a domain you control, with the DNS records Resend gives you, and is the better choice once you own a domain. Supabase's SMTP settings then use Resend's host, port and an API key as the password, entered only in the dashboard as above.
 
 Don't run `npx supabase config push`: it would copy the local settings (`site_url` = localhost, rate limit 100) to prod. The dashboard is the source of truth for prod auth settings.
 
@@ -147,7 +147,7 @@ The typed password isn't shown or saved in history. Claude never prints the envi
 
 Or run those commands yourself in your own terminal and paste the output (it contains no secrets).
 
-**Supabase MCP is read-only (owner decision 2026-11-18).** The owner chose read-only if it means Claude can't insert data through the MCP. `read_only=true` on the supabase server URL in `.mcp.json` makes the MCP run every query as a read-only Postgres user and turns off its write tools (migrations, edge function deploys, branch changes), so neither data nor schema can change through it. Migrations reach prod only through the CLI steps below, each with the owner's "go". The flag takes effect after restarting Claude Code (or reconnecting the server with `/mcp`). None of part B uses the MCP.
+<a id="supabase-mcp"></a>**Owner decision 2026-11-18: read-only MCP.** `read_only=true` (in `.mcp.json`) runs the MCP's queries as a read-only Postgres user and disables its write tools; migrations go through the CLI with per-step approval (below). Its features are trimmed to `docs`, `database`, `debugging` and `development`. Read-only still allows `SELECT` on prod rows, so Claude queries prod only for this runbook's read-only checks, never to browse data. It takes effect after restarting Claude Code (or `/mcp`).
 
 ### B1. Log in (owner)
 - [ ] **Owner runs** in their own terminal: `npx supabase login` (opens the browser; approve).

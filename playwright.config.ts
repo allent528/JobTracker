@@ -12,30 +12,25 @@ export default defineConfig({
   testDir: "tests/e2e",
   globalSetup: "./tests/e2e/global-setup.ts",
   fullyParallel: true,
-  // The long phone-width flows take 15-25s in Firefox and WebKit.
-  timeout: 60_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",
   use: {
     baseURL,
     timezoneId: "UTC",
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
   },
-  // Each project has its own test users (tests/e2e/support/local-env.ts), so the browsers can run
-  // side by side. `--project=chromium` for a quick run.
+  // Each project has its own test users (the `users` fixture), so the browsers run side by side.
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] }, timeout: 60_000 },
+    { name: "webkit", use: { ...devices["Desktop Safari"] }, timeout: 60_000 },
   ],
   webServer: {
-    // A production build: closer to what ships, and the dev server was too slow for three browsers
-    // at once (Firefox Server Actions stalled past their timeouts). An already running server on
-    // the port, such as `npm run dev`, is reused instead.
+    // A fresh production build each run; E2E_REUSE_SERVER=1 tests whatever already runs on the port.
     command: "npm run build && npm run start",
     url: `${baseURL}/login`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !!process.env.E2E_REUSE_SERVER,
     timeout: 300_000,
   },
 });

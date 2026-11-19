@@ -69,11 +69,4 @@ describe("forwardPathFrom", () => {
     expect(RESPONSE_RATE_STATUSES.reached).toEqual(["applied", "screening", "interviewing", "offer", "accepted"]);
     expect(RESPONSE_RATE_STATUSES.responded).toEqual(["screening", "interviewing", "offer", "accepted", "rejected"]);
   });
-
-  it("counts a rejection as a response, but not withdrawn or ghosted", () => {
-    expect(RESPONSE_RATE_STATUSES.responded).toContain("rejected");
-    expect(RESPONSE_RATE_STATUSES.responded).not.toContain("withdrawn");
-    expect(RESPONSE_RATE_STATUSES.responded).not.toContain("ghosted");
-    expect(RESPONSE_RATE_STATUSES.reached).not.toContain("rejected");
-  });
 });

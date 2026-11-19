@@ -13,7 +13,7 @@ const archivo = localFont({
   variable: "--font-archivo",
   display: "swap",
   // Preloading sent the font twice (a Link header and a <link> tag); Firefox fetched both and
-  // warned that one went unused. The stylesheet starts the one fetch instead.
+  // warned that one went unused.
   preload: false,
   fallback: ["ui-sans-serif", "system-ui", "sans-serif"],
 });

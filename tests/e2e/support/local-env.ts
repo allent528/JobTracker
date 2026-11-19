@@ -6,7 +6,7 @@ import type { Database, TablesInsert } from "../../../src/types/database.types";
 /**
  * Fake test users (D4), one set per Playwright project (browser). Each test has its own user, so
  * parallel tests, and the same test running in another browser, never share rows or an inbox.
- * Specs read them through `TEST_USERS` in fixtures.ts, which knows the current project.
+ * Specs get them from the `users` fixture in fixtures.ts.
  */
 const TEST_USER_SLUGS = {
   code: "code",
@@ -34,10 +34,12 @@ const TEST_USER_SLUGS = {
 } as const;
 
 export type TestUserKey = keyof typeof TEST_USER_SLUGS;
-export const TEST_USER_KEYS = Object.keys(TEST_USER_SLUGS) as TestUserKey[];
+export type TestUsers = Record<TestUserKey, string>;
 
-export function testUserEmail(key: TestUserKey, project: string): string {
-  return `e2e-${project}-${TEST_USER_SLUGS[key]}@example.com`;
+/** The test users of one Playwright project: `e2e-<project>-<slug>@example.com`. */
+export function testUsers(project: string): TestUsers {
+  const entries = Object.entries(TEST_USER_SLUGS).map(([key, slug]) => [key, `e2e-${project}-${slug}@example.com`]);
+  return Object.fromEntries(entries) as TestUsers;
 }
 
 /** Must never have an account; global setup deletes it if a past run left one. */

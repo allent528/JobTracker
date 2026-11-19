@@ -119,21 +119,22 @@ function StatusCountsTable({ counts }: { counts: StatusCounts }) {
   );
 }
 
+const REACHED_LABEL = STATUS_META[RESPONSE_RATE_FROM.reached].label;
+const RESPONDED_LABEL = STATUS_META[RESPONSE_RATE_FROM.responded].label;
+const CLOSED_RESPONSES = new Intl.ListFormat("en", { type: "disjunction" }).format(
+  RESPONSE_RATE_CLOSED_RESPONSES.map((status) => STATUS_META[status].label.toLowerCase()),
+);
+
 function ResponseRateTile({ rate }: { rate: ResponseRate }) {
-  const reachedLabel = STATUS_META[RESPONSE_RATE_FROM.reached].label;
-  const respondedLabel = STATUS_META[RESPONSE_RATE_FROM.responded].label;
-  const closedLabels = new Intl.ListFormat("en", { type: "disjunction" }).format(
-    RESPONSE_RATE_CLOSED_RESPONSES.map((status) => STATUS_META[status].label),
-  );
   if (rate.percent === null) {
-    return <p className="text-sm text-muted-foreground">No applications have reached {reachedLabel} yet.</p>;
+    return <p className="text-sm text-muted-foreground">No applications have reached {REACHED_LABEL} yet.</p>;
   }
   return (
     <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
       <p className="text-figure tabular-nums">{rate.percent}%</p>
       <p className="max-w-prose text-sm text-muted-foreground">
-        {rate.responded} of {rate.reached} applications that reached {reachedLabel} got to {respondedLabel} or
-        later, or to {closedLabels}.
+        {rate.responded} of {rate.reached} applications that reached {REACHED_LABEL} heard back: they reached{" "}
+        {RESPONDED_LABEL} or later, or were {CLOSED_RESPONSES}.
       </p>
     </div>
   );

@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { addDays, dateInTimeZone } from "../../src/lib/dates";
 import { localSuperuserQuery } from "../rls/support";
-import { collectConsoleErrors, expect, TEST_USERS, test } from "./support/fixtures";
+import { collectConsoleErrors, expect, test } from "./support/fixtures";
 import { adminClient, seedApplications } from "./support/local-env";
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -56,9 +56,9 @@ async function seedStats(email: string) {
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("shows the counts, weekly numbers, response rate and stage averages", async ({ page, signInAs }) => {
+  test("shows the counts, weekly numbers, response rate and stage averages", async ({ page, signInAs, users }) => {
     const consoleErrors = collectConsoleErrors(page);
-    const email = TEST_USERS.stats;
+    const email = users.stats;
     await signInAs(email);
     await seedStats(email);
 
@@ -75,9 +75,9 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Total 3" })).toBeVisible();
 
     const response = section(page, "Response rate");
-    await expect(response.getByText("100%")).toBeVisible(); // Globex's rejection counts as a response
+    await expect(response.getByText("100%")).toBeVisible();
     await expect(response).toContainText(
-      "2 of 2 applications that reached Applied got to Screening or later, or to Rejected.",
+      "2 of 2 applications that reached Applied heard back: they reached Screening or later, or were rejected.",
     );
 
     const weekly = section(page, /^Applications per week/);
@@ -110,20 +110,20 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Total 3" })).toBeVisible();
 
     await expectNoHorizontalScroll(page);
-    expect(consoleErrors).toEqual([]);
+    expect(consoleErrors()).toEqual([]);
   });
 });
 
-test("another user sees an empty dashboard, not the owner's stats", async ({ browser, page, signInAs }) => {
-  await signInAs(TEST_USERS.statsIsolationOwner);
-  await seedStats(TEST_USERS.statsIsolationOwner);
+test("another user sees an empty dashboard, not the owner's stats", async ({ browser, page, signInAs, users }) => {
+  await signInAs(users.statsIsolationOwner);
+  await seedStats(users.statsIsolationOwner);
   await page.goto("/stats");
   await expect(section(page, "Applications by status").getByRole("row", { name: "Total 3" })).toBeVisible();
 
   const context = await browser.newContext();
   const otherPage = await context.newPage();
   const consoleErrors = collectConsoleErrors(otherPage);
-  await signInAs(TEST_USERS.statsIsolationOther, otherPage);
+  await signInAs(users.statsIsolationOther, otherPage);
   for (const path of ["/stats", "/stats?archived=1"]) {
     await otherPage.goto(path);
     // Streaming can briefly leave a hidden copy of the content in the DOM.
@@ -134,6 +134,6 @@ test("another user sees an empty dashboard, not the owner's stats", async ({ bro
       await expect(section(otherPage, name)).toHaveCount(0);
     }
   }
-  expect(consoleErrors).toEqual([]);
+  expect(consoleErrors()).toEqual([]);
   await context.close();
 });

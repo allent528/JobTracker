@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { addDays, dateInTimeZone } from "../../src/lib/dates";
-import { collectConsoleErrors, expect, TEST_USERS, test } from "./support/fixtures";
+import { collectConsoleErrors, expect, test } from "./support/fixtures";
 import { adminClient, findUserByEmail, seedApplications, seedInterviews } from "./support/local-env";
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -29,9 +29,9 @@ async function storedTimeZone(email: string) {
 test.describe("at phone width", () => {
   test.use({ viewport: { width: 375, height: 740 } });
 
-  test("follow-ups and pending interviews land in the right lists", async ({ page, signInAs }) => {
+  test("follow-ups and pending interviews land in the right lists", async ({ page, signInAs, users }) => {
     const consoleErrors = collectConsoleErrors(page);
-    const email = TEST_USERS.homeBuckets;
+    const email = users.homeBuckets;
     await signInAs(email);
     const today = todayIn("UTC");
     const day = (offset: number) => addDays(today, offset);
@@ -89,12 +89,12 @@ test.describe("at phone width", () => {
     await expect(bucket(page, "Overdue")).toBeVisible();
 
     await expectNoHorizontalScroll(page);
-    expect(consoleErrors).toEqual([]);
+    expect(consoleErrors()).toEqual([]);
   });
 
-  test("marking a follow-up done clears it and offers the next one", async ({ page, signInAs }) => {
+  test("marking a follow-up done clears it and offers the next one", async ({ page, signInAs, users }) => {
     const consoleErrors = collectConsoleErrors(page);
-    const email = TEST_USERS.homeFollowUp;
+    const email = users.homeFollowUp;
     await signInAs(email);
     const today = todayIn("UTC");
     const [app] = await seedApplications(email, [
@@ -136,18 +136,19 @@ test.describe("at phone width", () => {
       .single();
     if (error) throw error;
     expect(data).toEqual({ next_follow_up_on: null, follow_up_note: null });
-    expect(consoleErrors).toEqual([]);
+    expect(consoleErrors()).toEqual([]);
   });
 });
 
 test("the browser's time zone is saved on first sign-in and can be changed in settings", async ({
   browser,
   signInAs,
+  users,
 }) => {
   // Kiritimati (UTC+14) and Pago Pago (UTC-11) are 25 hours apart, so their dates always differ.
   const ahead = "Pacific/Kiritimati";
   const behind = "Pacific/Pago_Pago";
-  const email = TEST_USERS.homeTimeZone;
+  const email = users.homeTimeZone;
   const context = await browser.newContext({ timezoneId: behind });
   const page = await context.newPage();
   const consoleErrors = collectConsoleErrors(page);
@@ -183,14 +184,14 @@ test("the browser's time zone is saved on first sign-in and can be changed in se
     await page.reload();
     await expect(page.getByText(`in ${ahead}.`)).toBeVisible();
     expect(await storedTimeZone(email)).toBe(ahead);
-    expect(consoleErrors).toEqual([]);
+    expect(consoleErrors()).toEqual([]);
   } finally {
     await context.close();
   }
 });
 
-test("another user sees none of the owner's reminders", async ({ page, browser, signInAs }) => {
-  const owner = TEST_USERS.homeIsolationOwner;
+test("another user sees none of the owner's reminders", async ({ page, browser, signInAs, users }) => {
+  const owner = users.homeIsolationOwner;
   await signInAs(owner);
   const today = todayIn("UTC");
   const [app] = await seedApplications(owner, [
@@ -205,7 +206,7 @@ test("another user sees none of the owner's reminders", async ({ page, browser, 
   const context = await browser.newContext();
   const other = await context.newPage();
   try {
-    await signInAs(TEST_USERS.homeIsolationOther, other);
+    await signInAs(users.homeIsolationOther, other);
     await expect(bucket(other, "Overdue").getByText("Nothing overdue.")).toBeVisible();
     await expect(bucket(other, "Today").getByText("Nothing due today.")).toBeVisible();
     await expect(bucket(other, "Next 7 days").getByText("Nothing in the next 7 days.")).toBeVisible();
