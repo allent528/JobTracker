@@ -3,8 +3,8 @@ import type { Page, Route } from "@playwright/test";
 import { UNREACHABLE_ERROR } from "../../src/lib/action-result";
 import { APPLICATION_NOT_FOUND } from "../../src/lib/applications";
 import { ACTIVE_STATUSES, CLOSED_STATUSES, STATUS_META } from "../../src/lib/status";
-import { expect, test } from "./support/fixtures";
-import { adminClient, findUserByEmail, seedApplications, TEST_USERS } from "./support/local-env";
+import { expect, expectHydrated, TEST_USERS, test } from "./support/fixtures";
+import { adminClient, findUserByEmail, seedApplications } from "./support/local-env";
 
 function dayFromTodayUtc(offset: number): string {
   const date = new Date();
@@ -110,6 +110,7 @@ test("board shows active columns in automatic order and moves a card from its ke
     { company: "Archived Co", role_title: "Engineer", status: "saved", archived_at: "2026-11-02T10:00:00Z" },
   ]);
   await page.goto("/applications");
+  await expectHydrated(column(page, "Saved"));
 
   for (const status of ACTIVE_STATUSES) await expect(column(page, STATUS_META[status].label)).toBeVisible();
   for (const status of CLOSED_STATUSES) await expect(column(page, STATUS_META[status].label)).toHaveCount(0);
@@ -158,15 +159,26 @@ test("dragging a card to another column changes its status", async ({ page, sign
   await signInAs(TEST_USERS.pipelineDrag);
   await seedApplications(TEST_USERS.pipelineDrag, [{ company: "Drag Co", role_title: "Engineer", status: "saved" }]);
   await page.goto("/applications");
+  await expectHydrated(card(page, "Saved", "Drag Co"));
 
   const source = await card(page, "Saved", "Drag Co").boundingBox();
-  const target = await column(page, "Screening").boundingBox();
-  if (!source || !target) throw new Error("Board not rendered.");
+  if (!source) throw new Error("Board not rendered.");
 
-  // Grab the card's padding (not the link or menu), then move in steps so the mouse sensor activates.
+  // Grab the card's padding (not the link or menu), then move past the mouse sensor's 8px so the
+  // drag starts. Measure the target only then: the layout can still move until the drag begins.
   await page.mouse.move(source.x + source.width - 8, source.y + 8);
   await page.mouse.down();
+  await page.mouse.move(source.x + source.width - 8, source.y + 24, { steps: 4 });
+  await expect(page.getByRole("status").filter({ hasText: "Drag Co" })).toHaveText(
+    /^(Picked up Drag Co|Drag Co is over Saved)\.$/,
+  );
+  const target = await column(page, "Screening").boundingBox();
+  if (!target) throw new Error("Board not rendered.");
   await page.mouse.move(target.x + target.width / 2, target.y + 80, { steps: 15 });
+  // The board works out the column under the pointer after the move event, so a release straight
+  // after the last move can still drop on the column before it (Firefox, WebKit). Release once the
+  // board announces the target.
+  await expect(page.getByRole("status").filter({ hasText: "Drag Co is" })).toHaveText("Drag Co is over Screening.");
   await page.mouse.up();
 
   await expect(card(page, "Screening", "Drag Co")).toBeVisible();
@@ -195,6 +207,7 @@ test("a move shows at once and rolls back when it fails or can't reach the serve
   ]);
   await page.goto("/applications");
   await expect(card(page, "Saved", "Gone Co")).toBeVisible();
+  await expectHydrated(card(page, "Saved", "Gone Co"));
 
   const user = await findUserByEmail(TEST_USERS.pipelineRollback);
   if (!user) throw new Error("Rollback test user is missing.");

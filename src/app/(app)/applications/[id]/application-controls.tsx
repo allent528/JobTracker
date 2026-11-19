@@ -42,7 +42,7 @@ function StatusSelect({ id, status }: StatusControlProps) {
   return (
     <div className="grid gap-3">
       <div className="grid gap-2">
-        <Label htmlFor={selectId}>Status</Label>
+        <Label htmlFor={selectId}>New status</Label>
         <div className="flex flex-wrap gap-2">
           <NativeSelect
             id={selectId}

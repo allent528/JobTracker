@@ -1,6 +1,13 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
-import { adminClient, findUserByEmail } from "./local-env";
+import {
+  adminClient,
+  findUserByEmail,
+  noAccountEmail,
+  TEST_USER_KEYS,
+  type TestUserKey,
+  testUserEmail,
+} from "./local-env";
 
 type Fixtures = {
   /**
@@ -45,3 +52,61 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
+
+/** The current project's test users (`testUserEmail`). Read them inside a test, where `test.info()` works. */
+export const TEST_USERS = {} as Readonly<Record<TestUserKey, string>>;
+for (const key of TEST_USER_KEYS) {
+  Object.defineProperty(TEST_USERS, key, {
+    enumerable: true,
+    get: () => testUserEmail(key, test.info().project.name),
+  });
+}
+
+/** The current project's address that never has an account. */
+export function noAccount(): string {
+  return noAccountEmail(test.info().project.name);
+}
+
+/**
+ * WebKit logs a cancelled fetch as "<url> due to access control checks." A full page load
+ * (`page.goto`) cancels Next's in-flight route prefetches (`?_rsc=`), so this shows up there
+ * without anything having failed. Only that shape, for a prefetch URL, is ignored.
+ */
+const WEBKIT_CANCELLED_PREFETCH = /^\S+[?&]_rsc=[\w-]+ due to access control checks\.$/;
+
+/** Collects console errors and warnings plus page errors; expect it to be empty at the end of a test. */
+export function collectConsoleErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() !== "error" && message.type() !== "warning") return;
+    if (WEBKIT_CANCELLED_PREFETCH.test(message.text())) return;
+    errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+  return errors;
+}
+
+/**
+ * Waits until React has hydrated the element and has no render work left. A click before that is
+ * lost, and React resets a controlled input filled while hydration is still in progress (the node
+ * already has its fiber, but the commit hasn't run). WebKit under parallel load can take seconds to
+ * get there, so interact only after this once a `page.goto` lands on a form or the board.
+ *
+ * Reads React internals (the node's fiber, then its root's `pendingLanes`). If React renames them,
+ * this times out rather than passing.
+ */
+export async function expectHydrated(locator: Locator) {
+  await expect
+    .poll(
+      () =>
+        locator.evaluate((element) => {
+          const key = Object.keys(element).find((name) => name.startsWith("__reactFiber$"));
+          type Fiber = { tag: number; return: Fiber | null; stateNode: { pendingLanes?: number } | null };
+          let fiber = key ? ((element as unknown as Record<string, Fiber>)[key] ?? null) : null;
+          while (fiber && fiber.tag !== 3) fiber = fiber.return; // 3: HostRoot
+          return fiber?.stateNode?.pendingLanes === 0;
+        }),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+}

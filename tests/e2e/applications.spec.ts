@@ -1,8 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { formatDate } from "../../src/lib/dates";
-import { expect, test } from "./support/fixtures";
-import { TEST_USERS } from "./support/local-env";
+import { expect, expectHydrated, TEST_USERS, test } from "./support/fixtures";
 
 // The e2e users have no profiles.time_zone, so "today" is today in UTC (FALLBACK_TIME_ZONE).
 const todayIsoUtc = () => new Date().toISOString().slice(0, 10);
@@ -13,7 +12,7 @@ function field(page: Page, label: string) {
 }
 
 function statusSelect(page: Page) {
-  return page.getByRole("combobox", { name: "Status", exact: true });
+  return page.getByRole("combobox", { name: "New status", exact: true });
 }
 
 function detail(page: Page, label: string) {
@@ -138,6 +137,7 @@ test.describe("at phone width", () => {
 test("a new application with a date applied starts in Applied", async ({ page, signInAs }) => {
   await signInAs(TEST_USERS.appliedOnCreate);
   await page.goto("/applications/new");
+  await expectHydrated(field(page, "Company"));
   await field(page, "Company").fill("Globex Inc");
   await field(page, "Role title").fill("Data Analyst");
   await field(page, "Date applied").fill("2026-11-02");
@@ -158,6 +158,7 @@ test("a new application with a date applied starts in Applied", async ({ page, s
 test("another user can't open someone else's application", async ({ browser, page, signInAs }) => {
   await signInAs(TEST_USERS.isolationOwner);
   await page.goto("/applications/new");
+  await expectHydrated(field(page, "Company"));
   await field(page, "Company").fill("Initech");
   await field(page, "Role title").fill("Platform Engineer");
   await field(page, "Follow-up note").fill("Owner-only note");

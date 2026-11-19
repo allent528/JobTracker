@@ -1,17 +1,8 @@
 import type { Page } from "@playwright/test";
 
 import { addDays, dateInTimeZone } from "../../src/lib/dates";
-import { expect, test } from "./support/fixtures";
-import { adminClient, findUserByEmail, seedApplications, seedInterviews, TEST_USERS } from "./support/local-env";
-
-function collectConsoleErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
-  return errors;
-}
+import { collectConsoleErrors, expect, TEST_USERS, test } from "./support/fixtures";
+import { adminClient, findUserByEmail, seedApplications, seedInterviews } from "./support/local-env";
 
 async function expectNoHorizontalScroll(page: Page) {
   const overflow = await page.evaluate(

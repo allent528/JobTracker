@@ -2,17 +2,8 @@ import type { Page } from "@playwright/test";
 
 import { addDays, dateInTimeZone } from "../../src/lib/dates";
 import { localSuperuserQuery } from "../rls/support";
-import { expect, test } from "./support/fixtures";
-import { adminClient, seedApplications, TEST_USERS } from "./support/local-env";
-
-function collectConsoleErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
-  return errors;
-}
+import { collectConsoleErrors, expect, TEST_USERS, test } from "./support/fixtures";
+import { adminClient, seedApplications } from "./support/local-env";
 
 async function expectNoHorizontalScroll(page: Page) {
   const overflow = await page.evaluate(
@@ -84,8 +75,10 @@ test.describe("at phone width", () => {
     await expect(byStatus.getByRole("row", { name: "Total 3" })).toBeVisible();
 
     const response = section(page, "Response rate");
-    await expect(response.getByText("50%")).toBeVisible();
-    await expect(response).toContainText("1 of 2 applications that reached Applied got to Screening or later.");
+    await expect(response.getByText("100%")).toBeVisible(); // Globex's rejection counts as a response
+    await expect(response).toContainText(
+      "2 of 2 applications that reached Applied got to Screening or later, or to Rejected.",
+    );
 
     const weekly = section(page, /^Applications per week/);
     await expect(weekly).toContainText("2 applications in the last 12 weeks.");
@@ -106,7 +99,7 @@ test.describe("at phone width", () => {
     await expect(page).toHaveURL("/stats?archived=1");
     await expect(byStatus.getByRole("row", { name: "Total 4" })).toBeVisible();
     await expect(byStatus.getByRole("row", { name: "Applied 1" })).toBeVisible();
-    await expect(response.getByText("33%")).toBeVisible();
+    await expect(response.getByText("67%")).toBeVisible();
     await expect(weekly).toContainText("3 applications in the last 12 weeks.");
 
     await page.reload();

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
-import { expect, test } from "./support/fixtures";
-import { adminClient, findUserByEmail, TEST_USERS } from "./support/local-env";
+import { collectConsoleErrors, expect, expectHydrated, TEST_USERS, test } from "./support/fixtures";
+import { adminClient, findUserByEmail } from "./support/local-env";
 
 // The e2e users have no profiles.time_zone, so interview times are read and shown in UTC.
 
@@ -25,15 +25,6 @@ async function expectNoHorizontalScroll(page: Page) {
 }
 
 /** Console errors and uncaught page errors, for a "console is clean" check at the end. */
-function collectConsoleErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
-  return errors;
-}
-
 async function createApplication(email: string, status = "applied") {
   const user = await findUserByEmail(email);
   if (!user) throw new Error(`Test user ${email} doesn't exist; global setup creates it.`);
@@ -66,6 +57,7 @@ test.describe("at phone width", () => {
     await expect(page.getByText("No contacts yet.")).toBeVisible();
     await expect(page.getByText("No interviews yet.")).toBeVisible();
 
+    await expectHydrated(page.getByRole("button", { name: "Add note" }));
     await page.getByRole("button", { name: "Add note" }).click();
     await expect(page.getByText("Enter the note.")).toBeVisible();
     await field(page, "New note").fill("Phone screen went well.\n\n- ask about **on-call**");

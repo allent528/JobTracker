@@ -3,34 +3,47 @@ import { createClient } from "@supabase/supabase-js";
 import { OTP_LENGTH } from "../../../src/lib/schemas/auth";
 import type { Database, TablesInsert } from "../../../src/types/database.types";
 
-/** Fake test users (D4). Each spec uses its own address so parallel tests don't share an inbox. */
-export const TEST_USERS = {
-  code: "e2e-code@example.com",
-  link: "e2e-link@example.com",
-  applications: "e2e-applications@example.com",
-  appliedOnCreate: "e2e-applied-on-create@example.com",
-  isolationOwner: "e2e-isolation-owner@example.com",
-  isolationOther: "e2e-isolation-other@example.com",
-  pipelineTable: "e2e-pipeline-table@example.com",
-  pipelineBoard: "e2e-pipeline-board@example.com",
-  pipelineDrag: "e2e-pipeline-drag@example.com",
-  pipelinePhone: "e2e-pipeline-phone@example.com",
-  pipelineRollback: "e2e-pipeline-rollback@example.com",
-  detailSections: "e2e-detail-sections@example.com",
-  detailIsolationOwner: "e2e-detail-isolation-owner@example.com",
-  detailIsolationOther: "e2e-detail-isolation-other@example.com",
-  homeBuckets: "e2e-home-buckets@example.com",
-  homeFollowUp: "e2e-home-follow-up@example.com",
-  homeTimeZone: "e2e-home-time-zone@example.com",
-  homeIsolationOwner: "e2e-home-isolation-owner@example.com",
-  homeIsolationOther: "e2e-home-isolation-other@example.com",
-  stats: "e2e-stats@example.com",
-  statsIsolationOwner: "e2e-stats-isolation-owner@example.com",
-  statsIsolationOther: "e2e-stats-isolation-other@example.com",
+/**
+ * Fake test users (D4), one set per Playwright project (browser). Each test has its own user, so
+ * parallel tests, and the same test running in another browser, never share rows or an inbox.
+ * Specs read them through `TEST_USERS` in fixtures.ts, which knows the current project.
+ */
+const TEST_USER_SLUGS = {
+  code: "code",
+  link: "link",
+  applications: "applications",
+  appliedOnCreate: "applied-on-create",
+  isolationOwner: "isolation-owner",
+  isolationOther: "isolation-other",
+  pipelineTable: "pipeline-table",
+  pipelineBoard: "pipeline-board",
+  pipelineDrag: "pipeline-drag",
+  pipelinePhone: "pipeline-phone",
+  pipelineRollback: "pipeline-rollback",
+  detailSections: "detail-sections",
+  detailIsolationOwner: "detail-isolation-owner",
+  detailIsolationOther: "detail-isolation-other",
+  homeBuckets: "home-buckets",
+  homeFollowUp: "home-follow-up",
+  homeTimeZone: "home-time-zone",
+  homeIsolationOwner: "home-isolation-owner",
+  homeIsolationOther: "home-isolation-other",
+  stats: "stats",
+  statsIsolationOwner: "stats-isolation-owner",
+  statsIsolationOther: "stats-isolation-other",
 } as const;
 
+export type TestUserKey = keyof typeof TEST_USER_SLUGS;
+export const TEST_USER_KEYS = Object.keys(TEST_USER_SLUGS) as TestUserKey[];
+
+export function testUserEmail(key: TestUserKey, project: string): string {
+  return `e2e-${project}-${TEST_USER_SLUGS[key]}@example.com`;
+}
+
 /** Must never have an account; global setup deletes it if a past run left one. */
-export const NO_ACCOUNT_EMAIL = "e2e-nobody@example.com";
+export function noAccountEmail(project: string): string {
+  return `e2e-${project}-nobody@example.com`;
+}
 
 const MAILPIT_URL = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
 

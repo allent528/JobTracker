@@ -1,6 +1,7 @@
-import { expect, type Page, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { OTP_LENGTH } from "../../src/lib/schemas/auth";
+import { expect, expectHydrated, noAccount, TEST_USERS, test } from "./support/fixtures";
 import {
   clearInbox,
   countMessages,
@@ -8,13 +9,12 @@ import {
   extractConfirmLink,
   findUserByEmail,
   latestMessage,
-  NO_ACCOUNT_EMAIL,
-  TEST_USERS,
 } from "./support/local-env";
 
 const CODE_LABEL = `${OTP_LENGTH}-digit code`;
 
 async function requestEmail(page: Page, email: string) {
+  await expectHydrated(page.getByLabel("Email"));
   await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Email me a sign-in link" }).click();
   await expect(page.getByRole("status")).toContainText("we sent it a sign-in link and a code");
@@ -100,13 +100,14 @@ test("sign in with the magic link, which works only once", async ({ page }) => {
 });
 
 test("an unknown email gets the same answer, no email and no account", async ({ page }) => {
-  await clearInbox(NO_ACCOUNT_EMAIL);
+  const nobody = noAccount();
+  await clearInbox(nobody);
 
   await page.goto("/login");
-  await requestEmail(page, NO_ACCOUNT_EMAIL);
+  await requestEmail(page, nobody);
 
   // Give the auth server time to have sent something, if it were going to.
   await page.waitForTimeout(1500);
-  expect(await countMessages(NO_ACCOUNT_EMAIL)).toBe(0);
-  expect(await findUserByEmail(NO_ACCOUNT_EMAIL)).toBeNull();
+  expect(await countMessages(nobody)).toBe(0);
+  expect(await findUserByEmail(nobody)).toBeNull();
 });
